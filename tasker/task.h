@@ -31,7 +31,11 @@ namespace tasker
 
 	template <typename F, typename ArgT>
 	struct task_result
-	{	typedef decltype((*static_cast<F *>(nullptr))(*static_cast<async_result<ArgT> *>(nullptr))) type;	};
+	{
+		static F value_f();
+		static async_result<ArgT> value_arg();
+		typedef decltype(value_f()(value_arg())) type;
+	};
 
 	template <typename T>
 	struct unwrapped_result
