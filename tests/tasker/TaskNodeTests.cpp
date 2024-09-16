@@ -60,18 +60,18 @@ namespace tasker
 				auto n6 = make_shared< task_node<void> >();
 
 				// INIT / ACT
-				n1->continue_with(make_continuation<int>([&] (const async_result<int> &v) {	log1.push_back(make_pair(0, *v));	}));
-				n1->continue_with(make_continuation<int>([&] (const async_result<int> &v) {	log1.push_back(make_pair(1, *v));	}));
-				n1->continue_with(make_continuation<int>([&] (const async_result<int> &v) {	log1.push_back(make_pair(2, *v));	}));
-				n2->continue_with(make_continuation<int>([&] (const async_result<int> &v) {	log1.push_back(make_pair(3, *v));	}));
+				n1->then(make_continuation<int>([&] (const async_result<int> &v) {	log1.push_back(make_pair(0, *v));	}));
+				n1->then(make_continuation<int>([&] (const async_result<int> &v) {	log1.push_back(make_pair(1, *v));	}));
+				n1->then(make_continuation<int>([&] (const async_result<int> &v) {	log1.push_back(make_pair(2, *v));	}));
+				n2->then(make_continuation<int>([&] (const async_result<int> &v) {	log1.push_back(make_pair(3, *v));	}));
 
-				n3->continue_with(make_continuation<string>([&] (const async_result<string> &v) {	log2.push_back(make_pair(0, *v));	}));
-				n3->continue_with(make_continuation<string>([&] (const async_result<string> &v) {	log2.push_back(make_pair(1, *v));	}));
-				n4->continue_with(make_continuation<string>([&] (const async_result<string> &v) {	log2.push_back(make_pair(2, *v));	}));
+				n3->then(make_continuation<string>([&] (const async_result<string> &v) {	log2.push_back(make_pair(0, *v));	}));
+				n3->then(make_continuation<string>([&] (const async_result<string> &v) {	log2.push_back(make_pair(1, *v));	}));
+				n4->then(make_continuation<string>([&] (const async_result<string> &v) {	log2.push_back(make_pair(2, *v));	}));
 
-				n5->continue_with(make_continuation<void>([&] (const async_result<void> &v) {	*v, log3++;	}));
-				n5->continue_with(make_continuation<void>([&] (const async_result<void> &v) {	*v, log3++;	}));
-				n6->continue_with(make_continuation<void>([&] (const async_result<void> &v) {	*v, log3++;	}));
+				n5->then(make_continuation<void>([&] (const async_result<void> &v) {	*v, log3++;	}));
+				n5->then(make_continuation<void>([&] (const async_result<void> &v) {	*v, log3++;	}));
+				n6->then(make_continuation<void>([&] (const async_result<void> &v) {	*v, log3++;	}));
 
 				// ACT
 				n1->set(3141);
@@ -135,10 +135,10 @@ namespace tasker
 				n4->set();
 
 				// ACT
-				n1->continue_with(make_continuation<int>([&] (const async_result<int> &v) {	log1.push_back(*v);	}));
-				n2->continue_with(make_continuation<int>([&] (const async_result<int> &v) {	log1.push_back(*v);	}));
-				n3->continue_with(make_continuation<string>([&] (const async_result<string> &v) {	log2.push_back(*v);	}));
-				n4->continue_with(make_continuation<void>([&] (const async_result<void> &v) {	*v, log3++;	}));
+				n1->then(make_continuation<int>([&] (const async_result<int> &v) {	log1.push_back(*v);	}));
+				n2->then(make_continuation<int>([&] (const async_result<int> &v) {	log1.push_back(*v);	}));
+				n3->then(make_continuation<string>([&] (const async_result<string> &v) {	log2.push_back(*v);	}));
+				n4->then(make_continuation<void>([&] (const async_result<void> &v) {	*v, log3++;	}));
 
 				// ASSERT
 				assert_equal(plural + 1211 + 17, log1);
@@ -154,7 +154,7 @@ namespace tasker
 				auto n1 = make_shared< task_node<void> >();
 				auto n2 = make_shared< task_node<void> >();
 
-				n1->continue_with(make_continuation<void>([&] (const async_result<void> &v) {
+				n1->then(make_continuation<void>([&] (const async_result<void> &v) {
 					try
 					{	*v;	}
 					catch (int e)
@@ -163,7 +163,7 @@ namespace tasker
 						faults++;
 					}
 				}));
-				n2->continue_with(make_continuation<void>([&] (const async_result<void> &v) {
+				n2->then(make_continuation<void>([&] (const async_result<void> &v) {
 					try
 					{	*v;	}
 					catch (string e)
@@ -186,7 +186,7 @@ namespace tasker
 				assert_equal(2, faults);
 
 				// ACT / ASSERT
-				n2->continue_with(make_continuation<void>([&] (const async_result<void> &v) {
+				n2->then(make_continuation<void>([&] (const async_result<void> &v) {
 					try
 					{	*v;	}
 					catch (string e)
@@ -214,8 +214,8 @@ namespace tasker
 				auto child1 = make_shared<dummy>();
 				auto child2 = make_shared<dummy>();
 
-				parent->continue_with(child1);
-				parent->continue_with(child2);
+				parent->then(child1);
+				parent->then(child2);
 
 				// ACT
 				parent->set();

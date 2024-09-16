@@ -53,7 +53,7 @@ namespace tasker
 		explicit task(std::shared_ptr< task_node<T> > &&node);
 
 		template <typename F>
-		task<typename task_result<F, T>::type> continue_with(F &&continuation_callback, queue &continue_on);
+		task<typename task_result<F, T>::type> then(F &&continuation_callback, queue &continue_on);
 
 		task<typename unwrapped_result<T>::type> unwrap();
 
@@ -90,7 +90,7 @@ namespace tasker
 	struct task_unwrap : task_node<T>, continuation< task<T> >, continuation<T>
 	{
 		virtual void begin(const std::shared_ptr< const async_result< task<T> > > &antecedant_result) override
-		{	(**antecedant_result)->continue_with(std::static_pointer_cast<task_unwrap>(this->shared_from_this()));	}
+		{	(**antecedant_result)->then(std::static_pointer_cast<task_unwrap>(this->shared_from_this()));	}
 
 		virtual void begin(const std::shared_ptr< const async_result<T> > &antecedant_result) override
 		{	this->set_result([&] (async_result<T> &r) {	r = *antecedant_result;	});	}
@@ -131,11 +131,11 @@ namespace tasker
 
 	template <typename T>
 	template <typename F>
-	inline task<typename task_result<F, T>::type> task<T>::continue_with(F &&continuation_callback, queue &continue_on)
+	inline task<typename task_result<F, T>::type> task<T>::then(F &&continuation_callback, queue &continue_on)
 	{
 		auto c = std::make_shared< task_continuation<F, T> >(std::forward<F>(continuation_callback), continue_on);
 
-		(*this)->continue_with(c);
+		(*this)->then(c);
 		return task<typename task_result<F, T>::type>(std::move(c));
 	}
 
@@ -144,7 +144,7 @@ namespace tasker
 	{
 		auto c = std::make_shared< task_unwrap<typename unwrapped_result<T>::type> >();
 
-		(*this)->continue_with(c);
+		(*this)->then(c);
 		return task<typename unwrapped_result<T>::type>(std::move(c));
 	}
 

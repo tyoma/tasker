@@ -1,7 +1,6 @@
 #include "helpers.h"
 
 #include <android/looper.h>
-#include <common/time.h>
 
 using namespace std;
 
@@ -42,20 +41,7 @@ namespace tasker
 		{	return make_shared<message_loop_android>();	}
 
 
-		function<mt::milliseconds ()> get_clock()
-		{	return [] {	return mt::milliseconds(micro_profiler::clock());	};	}
-
-		function<mt::milliseconds ()> create_stopwatch()
-		{
-			const auto myclock = get_clock();
-			const auto previous = make_shared<mt::milliseconds>(myclock());
-
-			return [myclock, previous] () -> mt::milliseconds {
-				const auto now = myclock();
-				const auto d = now - *previous;
-
-				return *previous = now, d;
-			};
-		}
+		function<mt::milliseconds()> get_clock()
+		{	return [] { return mt::milliseconds(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()); };	}
 	}
 }

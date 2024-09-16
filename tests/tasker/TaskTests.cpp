@@ -62,11 +62,11 @@ namespace tasker
 				auto t2 = task<int>::run([&] {	return 1;	}, queues[1]);
 
 				// ACT
-				t1.continue_with([&] (const async_result<int> &) {	return string();	}, queues[0]);
-				t1.continue_with([&] (const async_result<int> &) {	return 17;	}, queues[1]);
-				t2.continue_with([&] (const async_result<int> &) {	return string();	}, queues[1]);
-				t2.continue_with([&] (const async_result<int> &) {	return 17.19;	}, queues[1]);
-				t2.continue_with([&] (const async_result<int> &) {	return plural + 1 + 19;	}, queues[0]);
+				t1.then([&] (const async_result<int> &) {	return string();	}, queues[0]);
+				t1.then([&] (const async_result<int> &) {	return 17;	}, queues[1]);
+				t2.then([&] (const async_result<int> &) {	return string();	}, queues[1]);
+				t2.then([&] (const async_result<int> &) {	return 17.19;	}, queues[1]);
+				t2.then([&] (const async_result<int> &) {	return plural + 1 + 19;	}, queues[0]);
 
 				// ASSERT
 				assert_equal(1u, queues[0].tasks.size());
@@ -95,11 +95,11 @@ namespace tasker
 				auto t1 = task<int>::run([&] {	return 18;	}, queues[0]);
 				auto t2 = task<int>::run([&] {	return 1;	}, queues[1]);
 
-				t1.continue_with([&] (const async_result<int> &) {	return called[0]++, string();	}, queues[0]);
-				t1.continue_with([&] (const async_result<int> &) {	return called[1]++, 17;	}, queues[1]);
-				t2.continue_with([&] (const async_result<int> &) {	return called[2]++, string();	}, queues[1]);
-				t2.continue_with([&] (const async_result<int> &) {	return called[3]++, 17.19;	}, queues[1]);
-				t2.continue_with([&] (const async_result<int> &) {	return called[4]++, plural + 1 + 19;	}, queues[0]);
+				t1.then([&] (const async_result<int> &) {	return called[0]++, string();	}, queues[0]);
+				t1.then([&] (const async_result<int> &) {	return called[1]++, 17;	}, queues[1]);
+				t2.then([&] (const async_result<int> &) {	return called[2]++, string();	}, queues[1]);
+				t2.then([&] (const async_result<int> &) {	return called[3]++, 17.19;	}, queues[1]);
+				t2.then([&] (const async_result<int> &) {	return called[4]++, plural + 1 + 19;	}, queues[0]);
 
 				// ACT
 				queues[1].run_one();
@@ -145,9 +145,9 @@ namespace tasker
 
 				// INIT / ACT
 				task<int>::run([&] {	return called[0]++, 18;	}, queues[0])
-					.continue_with([&] (const async_result<int> &) {	return called[1]++, string("lorem ipsum");	}, queues[1])
-					.continue_with([&] (const async_result<string> &) {	return called[2]++, 1.1;	}, queues[0])
-					.continue_with([&] (const async_result<double> &) {	return called[3]++, 0;	}, queues[0]);
+					.then([&] (const async_result<int> &) {	return called[1]++, string("lorem ipsum");	}, queues[1])
+					.then([&] (const async_result<string> &) {	return called[2]++, 1.1;	}, queues[0])
+					.then([&] (const async_result<double> &) {	return called[3]++, 0;	}, queues[0]);
 
 				// ACT
 				queues[0].run_one();
@@ -190,8 +190,8 @@ namespace tasker
 				auto s1 = task<int>::run([&] {	return 18;	}, queues[0]);
 
 				// INIT / ACT
-				s1.continue_with([&] (const async_result<int> &a) {	return obtained1.push_back(make_pair(0, *a)), 1;	}, queues[0]);
-				s1.continue_with([&] (const async_result<int> &a) {	return obtained1.push_back(make_pair(1, *a)), 1;	}, queues[0]);
+				s1.then([&] (const async_result<int> &a) {	return obtained1.push_back(make_pair(0, *a)), 1;	}, queues[0]);
+				s1.then([&] (const async_result<int> &a) {	return obtained1.push_back(make_pair(1, *a)), 1;	}, queues[0]);
 
 				// ACT
 				queues[0].run_one();
@@ -211,9 +211,9 @@ namespace tasker
 				auto s2 = task<string>::run([&] {	return string("lorem");	}, queues[0]);
 
 				// INIT / ACT
-				s2.continue_with([&] (const async_result<string> &a) {	return obtained2.push_back(make_pair(0, *a)), 1;	}, queues[0]);
-				s2.continue_with([&] (const async_result<string> &a) {	return obtained2.push_back(make_pair(1, *a)), 1;	}, queues[0]);
-				s2.continue_with([&] (const async_result<string> &a) {	return obtained2.push_back(make_pair(2, *a)), 1;	}, queues[0]);
+				s2.then([&] (const async_result<string> &a) {	return obtained2.push_back(make_pair(0, *a)), 1;	}, queues[0]);
+				s2.then([&] (const async_result<string> &a) {	return obtained2.push_back(make_pair(1, *a)), 1;	}, queues[0]);
+				s2.then([&] (const async_result<string> &a) {	return obtained2.push_back(make_pair(2, *a)), 1;	}, queues[0]);
 
 				// ACT
 				queues[0].run_one();
@@ -236,11 +236,11 @@ namespace tasker
 				// INIT
 				vector< pair<int, int> > obtained1;
 				auto s1 = task<int>::run([] {	return 18;	}, queues[0])
-					.continue_with([] (const async_result<int> &) {	return 13;	}, queues[0]);
+					.then([] (const async_result<int> &) {	return 13;	}, queues[0]);
 
 				// INIT / ACT
-				s1.continue_with([&] (const async_result<int> &a) {	return obtained1.push_back(make_pair(0, *a)), 1;	}, queues[0]);
-				s1.continue_with([&] (const async_result<int> &a) {	return obtained1.push_back(make_pair(1, *a)), 1;	}, queues[0]);
+				s1.then([&] (const async_result<int> &a) {	return obtained1.push_back(make_pair(0, *a)), 1;	}, queues[0]);
+				s1.then([&] (const async_result<int> &a) {	return obtained1.push_back(make_pair(1, *a)), 1;	}, queues[0]);
 
 				// ACT
 				queues[0].run_one();
@@ -259,12 +259,12 @@ namespace tasker
 				// INIT
 				vector< pair<int, string> > obtained2;
 				auto s2 = task<int>::run([&] {	return 1;	}, queues[0])
-					.continue_with([] (const async_result<int> &) {	return string("ipsum");	}, queues[0]);
+					.then([] (const async_result<int> &) {	return string("ipsum");	}, queues[0]);
 
 				// INIT / ACT
-				s2.continue_with([&] (const async_result<string> &a) {	return obtained2.push_back(make_pair(0, *a)), 1;	}, queues[0]);
-				s2.continue_with([&] (const async_result<string> &a) {	return obtained2.push_back(make_pair(1, *a)), 1;	}, queues[0]);
-				s2.continue_with([&] (const async_result<string> &a) {	return obtained2.push_back(make_pair(2, *a)), 1;	}, queues[0]);
+				s2.then([&] (const async_result<string> &a) {	return obtained2.push_back(make_pair(0, *a)), 1;	}, queues[0]);
+				s2.then([&] (const async_result<string> &a) {	return obtained2.push_back(make_pair(1, *a)), 1;	}, queues[0]);
+				s2.then([&] (const async_result<string> &a) {	return obtained2.push_back(make_pair(2, *a)), 1;	}, queues[0]);
 
 				// ACT
 				queues[0].run_one();
@@ -288,9 +288,9 @@ namespace tasker
 				// INIT / ACT
 				auto step = 0;
 				task<void>::run([&] {	step = 17;	}, queues[0])
-					.continue_with([&] (const async_result<void> &r) {	return *r, step = 11, 17;	}, queues[1])
-					.continue_with([&] (const async_result<int> &r) {	*r, step = 3;	}, queues[0])
-					.continue_with([&] (const async_result<void> &r) {	*r, step = 5;	}, queues[0]);
+					.then([&] (const async_result<void> &r) {	return *r, step = 11, 17;	}, queues[1])
+					.then([&] (const async_result<int> &r) {	*r, step = 3;	}, queues[0])
+					.then([&] (const async_result<void> &r) {	*r, step = 5;	}, queues[0]);
 
 				// ASSERT
 				assert_equal(1u, queues[0].tasks.size());
@@ -334,14 +334,14 @@ namespace tasker
 			{
 				// INIT
 				auto called = 0;
-				task<void>::run([] {	throw 13;	}, queues[0]).continue_with([&] (const async_result<void> &r) {
+				task<void>::run([] {	throw 13;	}, queues[0]).then([&] (const async_result<void> &r) {
 					try
 					{	*r;	}
 					catch (int v)
 					{	assert_equal(13, v);	}
 					called++;
 				}, queues[0]);
-				task<void>::run([] () -> string {	throw "lorem";	}, queues[0]).continue_with([&] (const async_result<void> &r) {
+				task<void>::run([] () -> string {	throw "lorem";	}, queues[0]).then([&] (const async_result<void> &r) {
 					try
 					{	*r;	}
 					catch (const char *v)
@@ -362,8 +362,8 @@ namespace tasker
 				// INIT
 				auto called = 0;
 				task<void>::run([] {	}, queues[0])
-					.continue_with([] (const async_result<void> &) {	throw 19;	}, queues[0])
-					.continue_with([&] (const async_result<void> &r) {
+					.then([] (const async_result<void> &) {	throw 19;	}, queues[0])
+					.then([&] (const async_result<void> &r) {
 						try
 						{	*r;	}
 						catch (int v)
@@ -371,8 +371,8 @@ namespace tasker
 						called++;
 					}, queues[0]);
 				task<void>::run([] {	}, queues[0])
-					.continue_with([] (const async_result<void> &) -> string {	throw "amet";	}, queues[0])
-					.continue_with([&] (const async_result<string> &r) {
+					.then([] (const async_result<void> &) -> string {	throw "amet";	}, queues[0])
+					.then([&] (const async_result<string> &r) {
 						try
 						{	*r;	}
 						catch (const char *v)
@@ -399,8 +399,8 @@ namespace tasker
 				auto t2 = task< task<void> >::run([&] {	return task<void>(copy(s2));	}, queues[0]);
 
 				// ACT
-				t1.unwrap().continue_with([&] (const async_result<int> &r) {	results1.push_back(*r);	}, queues[1]);
-				t2.unwrap().continue_with([&] (const async_result<void> &)  {	called2++;	}, queues[1]);
+				t1.unwrap().then([&] (const async_result<int> &r) {	results1.push_back(*r);	}, queues[1]);
+				t2.unwrap().then([&] (const async_result<void> &)  {	called2++;	}, queues[1]);
 
 				// ASSERT
 				assert_equal(2u, queues[0].tasks.size());

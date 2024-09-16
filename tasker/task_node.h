@@ -44,7 +44,7 @@ namespace tasker
 		typedef async_result<T> result_type;
 
 	public:
-		void continue_with(const continuation_ptr &continuation_);
+		void then(const continuation_ptr &continuation_);
 
 		void fail(std::exception_ptr &&exception);
 
@@ -73,7 +73,7 @@ namespace tasker
 
 
 	template <typename T>
-	inline void task_node_base<T>::continue_with(const continuation_ptr &continuation_)
+	inline void task_node_base<T>::then(const continuation_ptr &continuation_)
 	{
 		for (mt::lock_guard<mt::mutex> l(_mtx); _result.state() == async_in_progress; )
 			return _continuations.push_back(continuation_);

@@ -18,7 +18,7 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 
-#include "../ui_queue.h"
+#include <tasker/ui_queue.h>
 
 #include "sys/timerfd.h"
 
