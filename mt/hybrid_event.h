@@ -20,44 +20,28 @@
 
 #pragma once
 
-#include <functional>
-#include <mt/hybrid_event.h>
-#include <mt/mutex.h>
-#include <queue>
-#include <utility>
+#include <mt/chrono.h>
+#include <mt/noncopyable.h>
 
-namespace tasker
+namespace mt
 {
-	class task_queue
+	class event;
+	
+	class hybrid_event : noncopyable
 	{
 	public:
-		typedef std::function<mt::milliseconds ()> clock;
-		typedef std::pair<mt::milliseconds /*execute in*/, bool /*valid*/> wake_up;
+		hybrid_event();
+		~hybrid_event();
 
-	public:
-		task_queue(const clock &clock_);
-
-		wake_up schedule(std::function<void ()> &&task, mt::milliseconds defer_by = mt::milliseconds(0));
-		wake_up execute_ready(mt::milliseconds max_duration);
-		void wait();
-		void stop();
+		void set();
+		bool wait(milliseconds timeout);
 
 	private:
-		struct deadlined_task
-		{
-			std::function<void ()> task;
-			mt::milliseconds deadline;
-			unsigned long long order;
-
-			bool operator <(const deadlined_task &rhs) const;
-		};
-
+		enum { max_spin = 5000 };
+		enum { state_reset, state_set, state_blocked };
+		
 	private:
-		std::priority_queue<deadlined_task> _tasks;
-		clock _clock;
-		mt::hybrid_event _ready;
-		mt::mutex _mutex;
-		unsigned long long _order;
-		bool _omit_notify, _stopped;
+		volatile long _state;
+		event *_semaphore;
 	};
 }

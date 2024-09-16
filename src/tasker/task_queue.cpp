@@ -108,7 +108,7 @@ namespace tasker
 			else
 			{
 				lock.unlock();
-				_ready.wait();
+				_ready.wait(mt::milliseconds(-1));
 			}
 		}
 	}
