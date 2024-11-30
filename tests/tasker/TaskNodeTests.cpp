@@ -147,7 +147,7 @@ namespace tasker
 			}
 
 
-			test( SettingFailureIsPropogatedToCallbacks )
+			test( SettingFailureViaExceptionPtrIsPropogatedToCallbacks )
 			{
 				// INIT
 				auto faults = 0;
@@ -190,6 +190,60 @@ namespace tasker
 					try
 					{	*v;	}
 					catch (string e)
+					{
+						assert_equal("LoremIpsum", e);
+						faults++;
+					}
+				}));
+
+				// ASSERT
+				assert_equal(3, faults);
+			}
+
+
+			test( SettingFailureViaExceptionValueIsPropogatedToCallbacks )
+			{
+				// INIT
+				auto faults = 0;
+				auto n1 = make_shared< task_node<void> >();
+				auto n2 = make_shared< task_node<void> >();
+
+				n1->then(make_continuation<void>([&] (const async_result<void> &v) {
+					try
+					{	*v;	}
+					catch (int e)
+					{
+						assert_equal(18131, e);
+						faults++;
+					}
+				}));
+				n2->then(make_continuation<void>([&] (const async_result<void> &v) {
+					try
+					{	*v;	}
+					catch (string e)
+					{
+						assert_equal("LoremIpsum", e);
+						faults++;
+					}
+				}));
+
+				// ACT
+				n1->fail(18131);
+
+				// ASSERT
+				assert_equal(1, faults);
+
+				// ACT
+				n2->fail(string("LoremIpsum"));
+
+				// ASSERT
+				assert_equal(2, faults);
+
+				// ACT / ASSERT
+				n2->then(make_continuation<void>([&] (const async_result<void> &v) {
+					try
+					{	*v;	}
+					catch (const string &e)
 					{
 						assert_equal("LoremIpsum", e);
 						faults++;

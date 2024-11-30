@@ -6,6 +6,7 @@ set(TASKER_TEST_SOURCES
 	AsyncResultTests.cpp
 	PrivateQueueTests.cpp
 	ThreadQueueTests.cpp
+	TaskAlgorithmTests.cpp
 	TaskNodeTests.cpp
 	TaskTests.cpp
 	TaskQueueTests.cpp

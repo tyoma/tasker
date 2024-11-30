@@ -30,8 +30,8 @@ namespace tasker
 				vector<int> called(2);
 
 				// INIT / ACT
-				auto t1 = task<int>::run([&] {	return called[0]++, 18;	}, queues[0]);
-				auto t2 = task<int>::run([&] {	return called[1]++, 181;	}, queues[1]);
+				auto t1 = schedule_task([&] {	return called[0]++, 18;	}, queues[0]);
+				auto t2 = schedule_task([&] {	return called[1]++, 181;	}, queues[1]);
 
 				// ASSERT
 				assert_equal(1u, queues[0].tasks.size());
@@ -58,8 +58,8 @@ namespace tasker
 			test( ContinuationsAreScheduledWhenAntecedentIsComplete )
 			{
 				// INIT
-				auto t1 = task<int>::run([&] {	return 18;	}, queues[0]);
-				auto t2 = task<int>::run([&] {	return 1;	}, queues[1]);
+				auto t1 = schedule_task([&] {	return 18;	}, queues[0]);
+				auto t2 = schedule_task([&] {	return 1;	}, queues[1]);
 
 				// ACT
 				t1.then([&] (const async_result<int> &) {	return string();	}, queues[0]);
@@ -92,8 +92,8 @@ namespace tasker
 			{
 				// INIT
 				vector<int> called(5);
-				auto t1 = task<int>::run([&] {	return 18;	}, queues[0]);
-				auto t2 = task<int>::run([&] {	return 1;	}, queues[1]);
+				auto t1 = schedule_task([&] {	return 18;	}, queues[0]);
+				auto t2 = schedule_task([&] {	return 1;	}, queues[1]);
 
 				t1.then([&] (const async_result<int> &) {	return called[0]++, string();	}, queues[0]);
 				t1.then([&] (const async_result<int> &) {	return called[1]++, 17;	}, queues[1]);
@@ -144,7 +144,7 @@ namespace tasker
 				vector<int> called(4);
 
 				// INIT / ACT
-				task<int>::run([&] {	return called[0]++, 18;	}, queues[0])
+				schedule_task([&] {	return called[0]++, 18;	}, queues[0])
 					.then([&] (const async_result<int> &) {	return called[1]++, string("lorem ipsum");	}, queues[1])
 					.then([&] (const async_result<string> &) {	return called[2]++, 1.1;	}, queues[0])
 					.then([&] (const async_result<double> &) {	return called[3]++, 0;	}, queues[0]);
@@ -187,7 +187,7 @@ namespace tasker
 			{
 				// INIT
 				vector< pair<int, int> > obtained1;
-				auto s1 = task<int>::run([&] {	return 18;	}, queues[0]);
+				auto s1 = schedule_task([&] {	return 18;	}, queues[0]);
 
 				// INIT / ACT
 				s1.then([&] (const async_result<int> &a) {	return obtained1.push_back(make_pair(0, *a)), 1;	}, queues[0]);
@@ -208,7 +208,7 @@ namespace tasker
 
 				// INIT
 				vector< pair<int, string> > obtained2;
-				auto s2 = task<string>::run([&] {	return string("lorem");	}, queues[0]);
+				auto s2 = schedule_task([&] {	return string("lorem");	}, queues[0]);
 
 				// INIT / ACT
 				s2.then([&] (const async_result<string> &a) {	return obtained2.push_back(make_pair(0, *a)), 1;	}, queues[0]);
@@ -235,7 +235,7 @@ namespace tasker
 			{
 				// INIT
 				vector< pair<int, int> > obtained1;
-				auto s1 = task<int>::run([] {	return 18;	}, queues[0])
+				auto s1 = schedule_task([] {	return 18;	}, queues[0])
 					.then([] (const async_result<int> &) {	return 13;	}, queues[0]);
 
 				// INIT / ACT
@@ -258,7 +258,7 @@ namespace tasker
 
 				// INIT
 				vector< pair<int, string> > obtained2;
-				auto s2 = task<int>::run([&] {	return 1;	}, queues[0])
+				auto s2 = schedule_task([&] {	return 1;	}, queues[0])
 					.then([] (const async_result<int> &) {	return string("ipsum");	}, queues[0]);
 
 				// INIT / ACT
@@ -287,7 +287,7 @@ namespace tasker
 			{
 				// INIT / ACT
 				auto step = 0;
-				task<void>::run([&] {	step = 17;	}, queues[0])
+				schedule_task([&] {	step = 17;	}, queues[0])
 					.then([&] (const async_result<void> &r) {	return *r, step = 11, 17;	}, queues[1])
 					.then([&] (const async_result<int> &r) {	*r, step = 3;	}, queues[0])
 					.then([&] (const async_result<void> &r) {	*r, step = 5;	}, queues[0]);
@@ -334,14 +334,14 @@ namespace tasker
 			{
 				// INIT
 				auto called = 0;
-				task<void>::run([] {	throw 13;	}, queues[0]).then([&] (const async_result<void> &r) {
+				schedule_task([] {	throw 13;	}, queues[0]).then([&] (const async_result<void> &r) {
 					try
 					{	*r;	}
 					catch (int v)
 					{	assert_equal(13, v);	}
 					called++;
 				}, queues[0]);
-				task<void>::run([] () -> string {	throw "lorem";	}, queues[0]).then([&] (const async_result<void> &r) {
+				schedule_task([] () -> string {	throw "lorem";	}, queues[0]).then([&] (const async_result<string> &r) {
 					try
 					{	*r;	}
 					catch (const char *v)
@@ -361,7 +361,7 @@ namespace tasker
 			{
 				// INIT
 				auto called = 0;
-				task<void>::run([] {	}, queues[0])
+				schedule_task([] {	}, queues[0])
 					.then([] (const async_result<void> &) {	throw 19;	}, queues[0])
 					.then([&] (const async_result<void> &r) {
 						try
@@ -370,7 +370,7 @@ namespace tasker
 						{	assert_equal(19, v);	}
 						called++;
 					}, queues[0]);
-				task<void>::run([] {	}, queues[0])
+				schedule_task([] {	}, queues[0])
 					.then([] (const async_result<void> &) -> string {	throw "amet";	}, queues[0])
 					.then([&] (const async_result<string> &r) {
 						try
@@ -395,8 +395,8 @@ namespace tasker
 				auto called2 = 0;
 				auto s1 = make_shared< task_node<int> >();
 				auto s2 = make_shared< task_node<void> >();
-				auto t1 = task< task<int> >::run([&] {	return task<int>(copy(s1));	}, queues[0]);
-				auto t2 = task< task<void> >::run([&] {	return task<void>(copy(s2));	}, queues[0]);
+				auto t1 = schedule_task([&] {	return task<int>(copy(s1));	}, queues[0]);
+				auto t2 = schedule_task([&] {	return task<void>(copy(s2));	}, queues[0]);
 
 				// ACT
 				t1.unwrap().then([&] (const async_result<int> &r) {	results1.push_back(*r);	}, queues[1]);

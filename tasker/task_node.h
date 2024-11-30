@@ -46,6 +46,8 @@ namespace tasker
 	public:
 		void then(const continuation_ptr &continuation_);
 
+		template <typename E>
+		void fail(const E& exception);
 		void fail(std::exception_ptr &&exception);
 
 	protected:
@@ -79,6 +81,11 @@ namespace tasker
 			return _continuations.push_back(continuation_);
 		continuation_->begin(std::shared_ptr<const result_type>(this->shared_from_this(), &_result));
 	}
+
+	template <typename T>
+	template <typename E>
+	inline void task_node_base<T>::fail(const E &exception)
+	{	set_result([&] (result_type &r) {	r.fail(exception);	});	}
 
 	template <typename T>
 	inline void task_node_base<T>::fail(std::exception_ptr &&exception)

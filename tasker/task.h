@@ -25,9 +25,20 @@
 
 namespace tasker
 {
+	struct cancelled : std::exception
+	{
+	};
+
 	template <typename T>
 	class task;
 
+
+	template <typename F>
+	struct invoke_result_0
+	{
+		static F value_f();
+		typedef decltype(value_f()()) type;
+	};
 
 	template <typename F, typename ArgT>
 	struct task_result
@@ -57,9 +68,6 @@ namespace tasker
 
 		task<typename unwrapped_result<T>::type> unwrap();
 
-		template <typename F>
-		static task run(F &&task_callback, queue &run_on);
-
 	private:
 		template <typename T2>
 		friend struct task_unwrap;
@@ -71,7 +79,7 @@ namespace tasker
 	{
 		task_root(F &&from);
 
-		F callback;
+		typename std::remove_reference<F>::type callback;
 	};
 
 	template <typename F, typename ArgT>
@@ -148,16 +156,6 @@ namespace tasker
 		return task<typename unwrapped_result<T>::type>(std::move(c));
 	}
 
-	template <typename T>
-	template <typename F>
-	inline task<T> task<T>::run(F &&task_callback, queue &run_on)
-	{
-		auto r = std::make_shared< task_root<T, F> >(std::forward<F>(task_callback));
-
-		run_on.schedule([r] {	tasker::set_result(*r, r->callback);	});
-		return task(std::move(r));
-	}
-
 
 	template <typename T, typename F>
 	inline task_root<T, F>::task_root(F &&from)
@@ -176,5 +174,17 @@ namespace tasker
 		auto self = std::static_pointer_cast<task_continuation>(this->shared_from_this());
 
 		_continue_on.schedule([result, self] {	tasker::set_result(*self, self->_callback, *result);	});
+	}
+
+
+	template <typename F>
+	inline task<typename invoke_result_0<F>::type> schedule_task(F &&task_callback, queue &run_on)
+	{
+		typedef typename invoke_result_0<F>::type task_type;
+
+		auto r = std::make_shared< task_root<task_type, F> >(std::forward<F>(task_callback));
+
+		run_on.schedule([r] {	tasker::set_result(*r, r->callback);	});
+		return task<task_type>(std::move(r));
 	}
 }

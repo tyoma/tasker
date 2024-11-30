@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <functional>
 #include <stdexcept>
 
 namespace tasker
@@ -36,20 +37,27 @@ namespace tasker
 		async_state state() const;
 
 		void operator =(const async_result &rhs);
+
 		void set(T &&from);
+
+		template <typename E>
+		void fail(const E &exception);
 		void fail(std::exception_ptr &&exception);
 
 		const T &operator *() const;
 
 	protected:
-		void check_set() const;
-		void check_read() const;
+		void assert_empty() const;
+		void assert_readable() const;
+
+	private:
+		typedef std::function<void ()> rethrow_t;
 
 	private:
 		async_result(const async_result &other);
 
 	private:
-		char _buffer[sizeof(T) > sizeof(std::exception_ptr) ? sizeof(T) : sizeof(std::exception_ptr)];
+		char _buffer[sizeof(T) > sizeof(rethrow_t) ? sizeof(T) : sizeof(rethrow_t)];
 
 	protected:
 		async_state _state;
@@ -79,7 +87,7 @@ namespace tasker
 		if (async_completed == _state)
 			static_cast<T *>(static_cast<void *>(_buffer))->~T();
 		else if (async_faulted == _state)
-			static_cast<std::exception_ptr *>(static_cast<void *>(_buffer))->~exception_ptr();
+			static_cast<const rethrow_t *>(static_cast<void *>(_buffer))->~rethrow_t();
 	}
 
 	template <typename T>
@@ -89,60 +97,71 @@ namespace tasker
 	template <typename T>
 	inline void async_result<T>::operator =(const async_result &rhs)
 	{
-		check_set();
+		assert_empty();
 		if (async_completed == rhs._state)
 			new (_buffer) T(*rhs);
 		else if (async_faulted == rhs._state)
-			new (_buffer) std::exception_ptr(*static_cast<const std::exception_ptr *>(static_cast<const void *>(rhs._buffer)));
+			new (_buffer) rethrow_t(*static_cast<const rethrow_t *>(static_cast<const void *>(rhs._buffer)));
 		_state = rhs._state;
 	}
 
 	template <typename T>
 	inline void async_result<T>::set(T &&from)
 	{
-		check_set();
+		assert_empty();
 		new (_buffer) T(std::forward<T>(from));
 		_state = async_completed;
 	}
 
 	template <typename T>
+	template <typename E>
+	inline void async_result<T>::fail(const E &exception)
+	{
+		auto e = exception;
+
+		assert_empty();
+		new (_buffer) rethrow_t([e] {	throw e;	});
+		_state = async_faulted;
+	}
+
+	template <typename T>
 	inline void async_result<T>::fail(std::exception_ptr &&exception)
 	{
-		check_set();
-		new (_buffer) std::exception_ptr(std::forward<std::exception_ptr>(exception));
+		assert_empty();
+		new (_buffer) rethrow_t([exception] {	std::rethrow_exception(exception);	});
 		_state = async_faulted;
 	}
 
 	template <typename T>
 	inline const T &async_result<T>::operator *() const
 	{
-		check_read();
+		assert_readable();
 		return *static_cast<const T *>(static_cast<const void *>(_buffer));
 	}
 
 	template <typename T>
-	inline void async_result<T>::check_set() const
+	inline void async_result<T>::assert_empty() const
 	{
 		if (async_in_progress != _state)
 			throw std::logic_error("a value/exception has already been set");
 	}
 
 	template <typename T>
-	inline void async_result<T>::check_read() const
+	inline void async_result<T>::assert_readable() const
 	{
 		if (async_in_progress == _state)
 			throw std::logic_error("cannot dereference as no value has been set");
 		else if (async_faulted == _state)
-			rethrow_exception(*static_cast<const std::exception_ptr *>(static_cast<const void *>(_buffer)));
+			(*static_cast<const rethrow_t *>(static_cast<const void *>(_buffer)))();
 	}
 
 
 	inline void async_result<void>::set()
 	{	
-		check_set();
+		assert_empty();
 		_state = async_completed;
 	}
 
 	inline void async_result<void>::operator *() const
-	{	check_read();	}
+	{	assert_readable();	}
 }
