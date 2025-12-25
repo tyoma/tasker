@@ -48,7 +48,7 @@ using namespace std;
 		if (wakeup.second)
 		{
 			const auto m = wakeup.first.count() ? @selector(executeReadyDefer:) : @selector(executeReady:);
-			const auto defer_by = [NSNumber numberWithLongLong:0.001 * wakeup.first.count()];
+			const auto defer_by = [NSNumber numberWithDouble:0.001 * wakeup.first.count()];
 
 			[self performSelector:m onThread:_thread withObject:defer_by waitUntilDone:false];
 		}
@@ -69,7 +69,7 @@ using namespace std;
 		[self scheduleWakeup:wakeup];
 	}
 
-	-(void) executeReadyDefer: (NSNumber *)defer_by;
+	-(void) executeReadyDefer: (NSObject *)defer_by;
 	{	[self performSelector:@selector(executeReady:) withObject:nil afterDelay:[defer_by doubleValue]];	}
 @end
 
@@ -104,7 +104,7 @@ namespace tasker
 	{	}
 		
 	void ui_queue::schedule(std::function<void ()> &&task, mt::milliseconds defer_by)
-	{	_impl->schedule_wakeup(_tasks.schedule(move(task), defer_by));	}
+	{	_impl->schedule_wakeup(_tasks.schedule(std::move(task), defer_by));	}
 
 	void ui_queue::stop()
 	{	_tasks.stop();	}
