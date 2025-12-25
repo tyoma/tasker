@@ -201,11 +201,11 @@ namespace tasker
 				}
 
 				moveable_task(moveable_task &&other)
-					: _value(move(other._value)), _enable_tracking(other._enable_tracking)
+					: _value(std::move(other._value)), _enable_tracking(other._enable_tracking)
 				{	assert_is_true(unique(_value));	}
 
 				moveable_task(shared_ptr<bool> &&v, const bool &enable_tracking)
-					: _value(move(v)), _enable_tracking(enable_tracking)
+					: _value(std::move(v)), _enable_tracking(enable_tracking)
 				{	}
 
 				void operator ()() const
@@ -226,7 +226,7 @@ namespace tasker
 				enable_tracking = true;
 
 				// ACT
-				queue->schedule(move(ft));
+				queue->schedule(std::move(ft));
 			}
 
 

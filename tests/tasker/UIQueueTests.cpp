@@ -202,6 +202,24 @@ namespace tasker
 				// ASSERT
 				assert_equal(1, x.use_count());
 			}
+    
+    
+            test( TasksDeferredPastQueueDeletionDoNotCrashTheQueue )
+            {
+                // INIT
+                shared_ptr<ui_queue> queue_;
+                threaded_message_loop tl([&] {
+                    queue_.reset(new ui_queue(get_clock()));
+                }, [&] {    queue_.reset();    });
+
+                // ACT / ASSERT
+                queue_->schedule([] {
+                }, mt::milliseconds(300));
+                queue_->schedule([&] {
+                    queue_.reset();
+                }, mt::milliseconds(100));
+                mt::this_thread::sleep_for(mt::milliseconds(1000));
+            }
 
 		end_test_suite
 	}

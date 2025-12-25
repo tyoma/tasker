@@ -30,12 +30,14 @@ using namespace std;
 @implementation Queue : NSObject
 	{
 		@public tasker::task_queue *tasks;
+        dispatch_queue_t _gcd_queue;
 		NSThread *_thread;
 	}
 	
 	-(id) init
 	{
 		self = [super init];
+        _gcd_queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
 		_thread = [NSThread currentThread];
 		return self;
 	}
@@ -43,18 +45,22 @@ using namespace std;
 	-(void) dealloc
 	{	[super dealloc];	}
 	
-	-(void) scheduleWakeup: (tasker::task_queue::wake_up)wakeup;
+	-(void) scheduleWakeup: (tasker::task_queue::wake_up)wakeup
 	{
-		if (wakeup.second)
-		{
-			const auto m = wakeup.first.count() ? @selector(executeReadyDefer:) : @selector(executeReady:);
-			const auto defer_by = [NSNumber numberWithDouble:0.001 * wakeup.first.count()];
+		if (!wakeup.second)
+			return;
 
-			[self performSelector:m onThread:_thread withObject:defer_by waitUntilDone:false];
-		}
+		auto execute = ^{
+			[self performSelector:@selector(executeReady:) onThread:_thread withObject:nil waitUntilDone:false];
+		};
+
+		if (auto delay_ms = wakeup.first.count())
+			dispatch_after(dispatch_time(DISPATCH_TIME_NOW, delay_ms * 1000000), _gcd_queue, execute);
+		else
+			execute();
 	}
 	
-	-(void) executeReady: (NSObject *)nothing;
+	-(void) executeReady: (NSObject *)nothing
 	{
 		tasker::task_queue::wake_up wakeup(mt::milliseconds(0), true);
 
@@ -68,9 +74,6 @@ using namespace std;
 		{	LOGE(PREAMBLE "unknown exception during scheduled task processing!") % A(_thread);	}
 		[self scheduleWakeup:wakeup];
 	}
-
-	-(void) executeReadyDefer: (NSObject *)defer_by;
-	{	[self performSelector:@selector(executeReady:) withObject:nil afterDelay:[defer_by doubleValue]];	}
 @end
 
 namespace tasker

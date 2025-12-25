@@ -34,6 +34,9 @@ namespace tasker
 		typedef std::shared_ptr<continuation> ptr;
 
 		virtual void begin(const std::shared_ptr< const async_result<T> > &antecedant) = 0;
+
+	protected:
+		virtual ~continuation() {	}
 	};
 
 	template <typename T>

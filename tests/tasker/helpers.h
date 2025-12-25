@@ -14,6 +14,9 @@ namespace tasker
 			virtual void exit() = 0;
 
 			static std::shared_ptr<message_loop> create();
+
+		protected:
+			virtual ~message_loop() {	}
 		};
 
 		mt::milliseconds clock();

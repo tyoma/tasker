@@ -31,6 +31,9 @@ namespace tasker
 		typedef std::function<mt::milliseconds ()> clock;
 
 		virtual void schedule(std::function<void ()> &&task, mt::milliseconds defer_by = mt::milliseconds(0)) = 0;
+
+	protected:
+		virtual ~queue() {	}
 	};
 
 	std::shared_ptr<queue> create_ui_bound_queue(const queue::clock &clock);

@@ -99,7 +99,7 @@
 			};
 			auto schedule_2 = [&] {
 				properThread = threadidM == mt::this_thread::get_id();
-				queueW->schedule(move(schedule_1), delay);
+				queueW->schedule(std::move(schedule_1), delay);
 			};
 
 			// ACT

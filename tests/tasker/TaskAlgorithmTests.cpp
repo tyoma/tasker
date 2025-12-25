@@ -24,8 +24,8 @@ namespace tasker
 					auto t = make_shared< task_node<bool> >();
 
 					called++;
-					t->set(move(false));
-					return task<bool>(move(t));
+					t->set(std::move(false));
+					return task<bool>(std::move(t));
 				}, q).then([&] (const async_result<void> &r) {
 					*r; // no exception
 					complete = true;
@@ -71,8 +71,8 @@ namespace tasker
 				loop([&] () -> task<bool> {
 					auto t = make_shared< task_node<bool> >();
 
-					t->set(move(--times > 0u));
-					return task<bool>(move(t));
+					t->set(std::move(--times > 0u));
+					return task<bool>(std::move(t));
 				}, q).then([&] (const async_result<void> &r) {
 					*r; // no exception
 					complete = true;
@@ -146,7 +146,7 @@ namespace tasker
 					auto t = make_shared< task_node<bool> >();
 
 					t->fail(runtime_error(""));
-					return task<bool>(move(t));
+					return task<bool>(std::move(t));
 				}, q).then([&] (const async_result<void> &r) {
 					try
 					{

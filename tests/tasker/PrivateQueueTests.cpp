@@ -78,7 +78,7 @@ namespace tasker
 				x = nullptr;
 
 				// ACT
-				pq.schedule(move(f));
+				pq.schedule(std::move(f));
 				u->tasks[0].first();
 
 				// ASSERT
