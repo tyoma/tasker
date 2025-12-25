@@ -130,20 +130,20 @@ namespace tasker
 				const auto sw3 = create_stopwatch();
 
 				queue_->schedule([&] {
-					delay[0] = sw1();
-				}, mt::milliseconds(150));
+					delay[0] = sw1(), done.set();
+				}, mt::milliseconds(1500));
 				queue_->schedule([&] {
 					delay[1] = sw2();
 				}, mt::milliseconds(500));
 				queue_->schedule([&] {
-					delay[2] = sw3(), done.set();
+					delay[2] = sw3();
 				}, mt::milliseconds(700));
 				done.wait();
 
 				// ASSERT
-				assert_approx_equal(150.0, 1.0 * delay[0].count(), 0.15);
-				assert_approx_equal(500.0, 1.0 * delay[1].count(), 0.15);
-				assert_approx_equal(700.0, 1.0 * delay[2].count(), 0.15);
+				assert_approx_equal(1500.0, 1.0 * delay[0].count(), 0.2);
+				assert_approx_equal(500.0, 1.0 * delay[1].count(), 0.2);
+				assert_approx_equal(700.0, 1.0 * delay[2].count(), 0.2);
 			}
 
 

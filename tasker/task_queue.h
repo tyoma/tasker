@@ -21,7 +21,7 @@
 #pragma once
 
 #include <functional>
-#include <mt/hybrid_event.h>
+#include <mt/event.h>
 #include <mt/mutex.h>
 #include <queue>
 #include <utility>
@@ -55,7 +55,7 @@ namespace tasker
 	private:
 		std::priority_queue<deadlined_task> _tasks;
 		clock _clock;
-		mt::hybrid_event _ready;
+		mt::event _ready;
 		mt::mutex _mutex;
 		unsigned long long _order;
 		bool _omit_notify, _stopped;

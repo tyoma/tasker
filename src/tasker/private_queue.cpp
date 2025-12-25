@@ -70,7 +70,7 @@ namespace tasker
 		});
 
 		task = function<void ()>();
-		_apartment_queue.schedule(move(captured), defer_by);
+		_apartment_queue.schedule(std::move(captured), defer_by);
 	}
 
 
@@ -99,7 +99,7 @@ namespace tasker
 			}
 		});
 
-		_worker_queue.schedule(move(wrapped_task));
+		_worker_queue.schedule(std::move(wrapped_task));
 	}
 
 	void private_worker_queue::deliver(function<void ()> &&progress)
@@ -110,7 +110,7 @@ namespace tasker
 				progress();
 		});
 
-		_apartment_queue.schedule(move(wrapped_progress));
+		_apartment_queue.schedule(std::move(wrapped_progress));
 	}
 
 
@@ -119,5 +119,5 @@ namespace tasker
 	{	}
 
 	void private_worker_queue::completion::deliver(function<void ()> &&progress)
-	{	_owner.deliver(move(progress));	}
+	{	_owner.deliver(std::move(progress));	}
 }

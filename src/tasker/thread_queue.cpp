@@ -35,7 +35,7 @@ namespace tasker
 	}
 
 	void thread_queue::schedule(function<void ()> &&task, mt::milliseconds defer_by)
-	{	_underlying.schedule(move(task), defer_by);	}
+	{	_underlying.schedule(std::move(task), defer_by);	}
 
 	void thread_queue::run()
 	{

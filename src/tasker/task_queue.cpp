@@ -58,13 +58,13 @@ namespace tasker
 		if (_stopped)
 			return make_pair(mt::milliseconds(0), false);
 
-		deadlined_task t = {	move(task), _clock() + defer_by, _order++	};
+		deadlined_task t = {	std::move(task), _clock() + defer_by, _order++	};
 		const auto notify = !_omit_notify && (_tasks.empty() || t.deadline < _tasks.top().deadline);
 
 #if _MSC_VER && _MSC_VER == 1600 // MSVC 10.0
 		task = function<void ()>();
 #endif
-		_tasks.emplace(move(t));
+		_tasks.emplace(std::move(t));
 		return make_pair(notify ? _ready.set(), defer_by : mt::milliseconds(0), notify);
 	}
 
@@ -77,7 +77,7 @@ namespace tasker
 		for (const auto deadline = now + max_duration; now < deadline && !_tasks.empty() && _tasks.top().deadline <= now;
 			now = _clock(), lock.lock())
 		{
-			auto task = move(_tasks.top().task);
+			auto task = std::move(_tasks.top().task);
 
 			_tasks.pop();
 			lock.unlock();
@@ -108,7 +108,7 @@ namespace tasker
 			else
 			{
 				lock.unlock();
-				_ready.wait(mt::milliseconds(-1));
+				_ready.wait();
 			}
 		}
 	}
