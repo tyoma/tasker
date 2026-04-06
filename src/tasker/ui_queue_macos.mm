@@ -37,13 +37,16 @@ using namespace std;
 	-(id) init
 	{
 		self = [super init];
-        _gcd_queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+        _gcd_queue = dispatch_queue_create("com.tasker.ui_queue", DISPATCH_QUEUE_SERIAL);
 		_thread = [NSThread currentThread];
 		return self;
 	}
 	
 	-(void) dealloc
-	{	[super dealloc];	}
+	{
+        dispatch_release(_gcd_queue);
+		[super dealloc];
+	}
 	
 	-(void) scheduleWakeup: (tasker::task_queue::wake_up)wakeup
 	{
