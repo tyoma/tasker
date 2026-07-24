@@ -25,6 +25,7 @@ elseif (ANDROID)
 endif()
 
 add_library(tasker STATIC ${TASKER_SOURCES})
+target_compile_definitions(tasker PUBLIC $<$<BOOL:${TASKER_USE_STD_MT}>:TASKER_USE_STD_MT>)
 
 if (APPLE)
 	target_link_libraries(tasker "-framework Foundation -framework Cocoa")

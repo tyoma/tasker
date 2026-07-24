@@ -29,22 +29,22 @@ using namespace std;
 
 @implementation Queue : NSObject
 	{
-		@public tasker::task_queue *tasks;
-        dispatch_queue_t _gcd_queue;
+		@public shared_ptr<tasker::task_queue> tasks;
+		dispatch_queue_t _gcd_queue;
 		NSThread *_thread;
 	}
 	
 	-(id) init
 	{
 		self = [super init];
-        _gcd_queue = dispatch_queue_create("com.tasker.ui_queue", DISPATCH_QUEUE_SERIAL);
+		_gcd_queue = dispatch_queue_create("com.tasker.ui_queue", DISPATCH_QUEUE_SERIAL);
 		_thread = [NSThread currentThread];
 		return self;
 	}
 	
 	-(void) dealloc
 	{
-        dispatch_release(_gcd_queue);
+		dispatch_release(_gcd_queue);
 		[super dealloc];
 	}
 	
@@ -69,13 +69,15 @@ using namespace std;
 
 		if (!tasks)
 			return;
+		auto tasks_ = tasks;
 		try
-		{	wakeup = tasks->execute_ready(mt::milliseconds(50));	}
+		{	wakeup = tasks_->execute_ready(mt::milliseconds(50));	}
 		catch (exception &e)
 		{	LOGE(PREAMBLE "exception during scheduled task processing!") % A(_thread) % A(e.what());	}
 		catch (...)
 		{	LOGE(PREAMBLE "unknown exception during scheduled task processing!") % A(_thread);	}
-		[self scheduleWakeup:wakeup];
+		if (tasks_.use_count() > 1)
+			[self scheduleWakeup:wakeup];
 	}
 @end
 
@@ -83,9 +85,9 @@ namespace tasker
 {
 	struct ui_queue::impl
 	{
-		impl(task_queue &queue_)
+		impl(const shared_ptr<task_queue> &queue_)
 			: _queue([[Queue alloc] init])
-		{	_queue->tasks = &queue_;	}
+		{	_queue->tasks = queue_;	}
 		
 		~impl()
 		{
@@ -103,15 +105,15 @@ namespace tasker
 
 
 	ui_queue::ui_queue(const clock &clock_)
-		: _tasks(clock_), _impl(make_shared<impl>(_tasks))
+		: _tasks(make_shared<task_queue>(clock_)), _impl(make_shared<impl>(_tasks))
 	{	}
 		
 	ui_queue::~ui_queue()
 	{	}
 		
 	void ui_queue::schedule(std::function<void ()> &&task, mt::milliseconds defer_by)
-	{	_impl->schedule_wakeup(_tasks.schedule(std::move(task), defer_by));	}
+	{	_impl->schedule_wakeup(_tasks->schedule(std::move(task), defer_by));	}
 
 	void ui_queue::stop()
-	{	_tasks.stop();	}
+	{	_tasks->stop();	}
 }

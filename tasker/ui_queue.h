@@ -39,7 +39,7 @@ namespace tasker
 		struct impl;
 
 	private:
-		task_queue _tasks;
+		std::shared_ptr<task_queue> _tasks;
 		std::shared_ptr<impl> _impl;
 	};
 }

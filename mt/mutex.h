@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined(MP_MT_GENERIC)
+#if defined(TASKER_USE_STD_MT)
 	#include <mutex>
 
 	namespace mt

@@ -32,8 +32,8 @@ namespace tasker
 {
 	struct ui_queue::impl
 	{
-		impl(task_queue &tasks)
-			: _tasks(&tasks), _hwnd(::CreateWindow(_T("static"), 0, WS_OVERLAPPED, 0, 0, 0, 0, HWND_MESSAGE, 0, 0, 0))
+		impl(const shared_ptr<task_queue> &tasks)
+			: _tasks(tasks), _hwnd(::CreateWindow(_T("static"), 0, WS_OVERLAPPED, 0, 0, 0, 0, HWND_MESSAGE, 0, 0, 0))
 		{	::SetWindowLongPtr(_hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&impl::on_message));	}
 
 		~impl()
@@ -60,34 +60,36 @@ namespace tasker
 			case WM_USER:
 				const auto self = reinterpret_cast<impl *>(wparam);
 				task_queue::wake_up wakeup(mt::milliseconds(0), true);
+				auto tasks = self->_tasks; // Keep the queue alive while executing tasks.
 
 				try
-				{	wakeup = self->_tasks->execute_ready(mt::milliseconds(50));	}
+				{	wakeup = tasks->execute_ready(mt::milliseconds(50));	}
 				catch (exception &e)
 				{	LOGE(PREAMBLE "exception during scheduled task processing!") % A(self) % A(e.what());	}
 				catch (...)
 				{	LOGE(PREAMBLE "unknown exception during scheduled task processing!") % A(self);	}
-				self->schedule_wakeup(wakeup);
+				if (tasks.use_count() > 1)
+					self->schedule_wakeup(wakeup);
 			}
 			return 0;
 		}
 
 	private:
-		task_queue *_tasks;
+		shared_ptr<task_queue> _tasks;
 		HWND _hwnd;
 	};
 
 
 	ui_queue::ui_queue(const clock &clock_)
-		: _tasks(clock_), _impl(make_shared<impl>(_tasks))
+		: _tasks(make_shared<task_queue>(clock_)), _impl(make_shared<impl>(_tasks))
 	{	LOG(PREAMBLE "constructed...") % A(this) % A(_impl.get());	}
 
 	ui_queue::~ui_queue()
 	{	LOG(PREAMBLE "destroyed...") % A(this);	}
 
 	void ui_queue::schedule(function<void ()> &&task, mt::milliseconds defer_by)
-	{	_impl->schedule_wakeup(_tasks.schedule(move(task), defer_by));	}
+	{	_impl->schedule_wakeup(_tasks->schedule(move(task), defer_by));	}
 
 	void ui_queue::stop()
-	{	_tasks.stop();	}
+	{	_tasks->stop();	}
 }

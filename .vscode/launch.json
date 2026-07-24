@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug tasker tests (utee-runner)",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/_build/_bin/utee-runner",
+      "args": [
+        "./libtasker.tests.dylib"
+      ],
+      "cwd": "${workspaceFolder}/_build/_bin",
+      "stopAtEntry": false,
+      "externalConsole": false
+    }
+  ]
+}

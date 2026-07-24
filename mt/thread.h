@@ -2,16 +2,35 @@
 
 #include "chrono.h"
 
-#if defined(MP_MT_GENERIC)
+#if defined(TASKER_USE_STD_MT)
 	#include <thread>
 
 	namespace mt
 	{
-		using std::thread;
+		class thread : public std::thread
+		{
+		public:
+			template <typename F>
+			thread(F &&thread_function);
+			~thread();
+		};
 
 		namespace this_thread
 		{
 			using namespace std::this_thread;
+		}
+
+
+
+		template <typename F>
+		inline thread::thread(F &&thread_function)
+			: std::thread(std::forward<F>(thread_function))
+		{	}
+
+		inline thread::~thread()
+		{
+			if (joinable())
+				join();
 		}
 	}
 #else

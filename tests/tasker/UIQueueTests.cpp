@@ -202,24 +202,32 @@ namespace tasker
 				// ASSERT
 				assert_equal(1, x.use_count());
 			}
-    
-    
-            test( TasksDeferredPastQueueDeletionDoNotCrashTheQueue )
-            {
-                // INIT
-                shared_ptr<ui_queue> queue_;
-                threaded_message_loop tl([&] {
-                    queue_.reset(new ui_queue(get_clock()));
-                }, [&] {    queue_.reset();    });
 
-                // ACT / ASSERT
-                queue_->schedule([] {
-                }, mt::milliseconds(300));
-                queue_->schedule([&] {
-                    queue_.reset();
-                }, mt::milliseconds(100));
-                mt::this_thread::sleep_for(mt::milliseconds(1000));
-            }
+
+			test( TasksDeferredPastQueueDeletionDoNotCrashTheQueue )
+			{
+				// INIT
+				auto clock_called_normally_past_queue_destruction = false;
+				shared_ptr<ui_queue> queue_;
+				threaded_message_loop tl([&] {
+					queue_.reset(new ui_queue([&] {
+						if (!queue_)
+							clock_called_normally_past_queue_destruction = true;
+						return tests::clock();
+					}));
+				}, [&] {	queue_.reset();	});
+				
+				// ACT / ASSERT
+				queue_->schedule([] {
+				}, mt::milliseconds(300));
+				queue_->schedule([&] {
+					queue_.reset();
+				}, mt::milliseconds(100));
+				mt::this_thread::sleep_for(mt::milliseconds(1000));
+
+				// ASSERT
+				assert_is_true(clock_called_normally_past_queue_destruction);
+			}
 
 		end_test_suite
 	}

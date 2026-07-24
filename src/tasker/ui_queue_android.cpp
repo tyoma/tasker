@@ -111,7 +111,7 @@ namespace tasker
 
 	struct ui_queue::impl
 	{
-		impl(task_queue &tasks)
+		impl(const shared_ptr<task_queue> &tasks)
 			: _tasks(tasks)
 		{
 			if (1 != ALooper_addFd(_looper, _pipe.get_read_fd(), ALOOPER_POLL_CALLBACK, ALOOPER_EVENT_INPUT,
@@ -165,18 +165,20 @@ namespace tasker
 		void execute_ready()
 		{
 			task_queue::wake_up wakeup(mt::milliseconds(0), true);
+			auto tasks = _tasks;
 
 			try
-			{	wakeup = _tasks.execute_ready(mt::milliseconds(50));	}
+			{	wakeup = tasks->execute_ready(mt::milliseconds(50));	}
 			catch (exception &e)
 			{	LOGE(PREAMBLE "exception during scheduled task processing!") % A(this) % A(e.what());	}
 			catch (...)
 			{	LOGE(PREAMBLE "unknown exception during scheduled task processing!") % A(this);	}
-			schedule_wakeup(wakeup);
+			if (tasks.use_count() > 1)
+				schedule_wakeup(wakeup);
 		}
 
 	private:
-		task_queue &_tasks;
+		shared_ptr<task_queue> _tasks;
 		looper _looper;
 		pipe _pipe;
 		timer _timer;
@@ -184,15 +186,15 @@ namespace tasker
 
 
 	ui_queue::ui_queue(const clock &clock_)
-		: _tasks(clock_), _impl(make_shared<impl>(_tasks))
+		: _tasks(make_shared<task_queue>(clock_)), _impl(make_shared<impl>(_tasks))
 	{	LOG(PREAMBLE "constructed...") % A(this) % A(_impl.get());	}
 
 	ui_queue::~ui_queue()
 	{	LOG(PREAMBLE "destroyed...") % A(this);	}
 
 	void ui_queue::schedule(function<void ()> &&task, mt::milliseconds defer_by)
-	{	_impl->schedule_wakeup(_tasks.schedule(move(task), defer_by));	}
+	{	_impl->schedule_wakeup(_tasks->schedule(move(task), defer_by));	}
 
 	void ui_queue::stop()
-	{	_tasks.stop();	}
+	{	_tasks->stop();	}
 }

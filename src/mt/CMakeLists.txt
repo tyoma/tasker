@@ -2,8 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 
 set(MT_SOURCES)
 
-if(MP_MT_GENERIC)
-	add_definitions(-DMP_MT_GENERIC)
+if(TASKER_USE_STD_MT)
 	set(MT_SOURCES
 		event_generic.cpp
 	)
@@ -34,4 +33,7 @@ elseif(UNIX)
 endif()
 
 add_library(mt STATIC ${MT_SOURCES})
+target_compile_definitions(mt PUBLIC $<$<BOOL:${TASKER_USE_STD_MT}>:TASKER_USE_STD_MT>)
+
 add_library(mt.thread_callbacks OBJECT ${MT_THREAD_SOURCES})
+target_compile_definitions(mt.thread_callbacks PUBLIC $<$<BOOL:${TASKER_USE_STD_MT}>:TASKER_USE_STD_MT>)
