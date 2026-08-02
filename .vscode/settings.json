@@ -1,0 +1,5 @@
+{
+    "sarif-viewer.connectToGithubCodeScanning": "off",
+    "cmake.buildDirectory": "${workspaceFolder}/_build.${buildType}_${buildKitTargetOs}_${buildKitTargetArch}",
+    "editor.rulers": [120]
+}

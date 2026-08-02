@@ -27,7 +27,13 @@
 
 using namespace std;
 
-@implementation Queue : NSObject
+@interface Queue : NSObject
+	-(id) init;
+	-(void) scheduleWakeup: (tasker::task_queue::wake_up)wakeup;
+	-(void) executeReady: (NSObject *)nothing;
+@end
+
+@implementation Queue
 	{
 		@public shared_ptr<tasker::task_queue> tasks;
 		dispatch_queue_t _gcd_queue;

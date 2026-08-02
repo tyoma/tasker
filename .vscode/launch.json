@@ -3,15 +3,16 @@
   "configurations": [
     {
       "name": "Debug tasker tests (utee-runner)",
-      "type": "lldb",
+      "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/_build/_bin/utee-runner",
+      "program": "${command:cmake.buildDirectory}/_bin/utee-runner",
       "args": [
-        "./libtasker.tests.dylib"
+        "${command:cmake.buildDirectory}/_bin/libtasker.tests.dylib"
       ],
-      "cwd": "${workspaceFolder}/_build/_bin",
+      "cwd": "${command:cmake.buildDirectory}/_bin",
       "stopAtEntry": false,
-      "externalConsole": false
+      "externalConsole": false,
+      "MIMode": "lldb"
     }
   ]
 }

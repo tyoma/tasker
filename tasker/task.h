@@ -22,6 +22,7 @@
 
 #include "scheduler.h"
 #include "task_node.h"
+#include "type_traits.h"
 
 namespace tasker
 {
@@ -30,49 +31,20 @@ namespace tasker
 	};
 
 	template <typename T>
-	class task;
-
-
-	template <typename F>
-	struct invoke_result_0
-	{
-		static F value_f();
-		typedef decltype(value_f()()) type;
-	};
-
-	template <typename F, typename ArgT>
-	struct task_result
-	{
-		static F value_f();
-		static async_result<ArgT> value_arg();
-		typedef decltype(value_f()(value_arg())) type;
-	};
-
-	template <typename T>
-	struct unwrapped_result
-	{	typedef void type;	};
-
-	template <typename T>
-	struct unwrapped_result< task<T> >
-	{	typedef T type;	};
-
-
-	template <typename T>
-	class task : std::shared_ptr< task_node<T> >
+	class task : task_node<T>::ptr
 	{
 	public:
-		explicit task(std::shared_ptr< task_node<T> > &&node);
+		explicit task(typename task_node<T>::ptr &&node);
 
 		template <typename F>
-		task<typename task_result<F, T>::type> then(F &&continuation_callback, queue &continue_on);
+		task<detail::invoke_result_t<F, T>> then(F &&continuation_callback, queue &continue_on) const;
 
-		task<typename unwrapped_result<T>::type> unwrap();
+		task<detail::unwrapped_result_t<T>> unwrap();
 
 	private:
 		template <typename T2>
 		friend struct task_unwrap;
 	};
-
 
 	template <typename T, typename F>
 	struct task_root : task_node<T>
@@ -83,11 +55,11 @@ namespace tasker
 	};
 
 	template <typename F, typename ArgT>
-	struct task_continuation : task_node<typename task_result<F, ArgT>::type>, continuation<ArgT>
+	struct task_continuation : task_node<detail::invoke_result_t<F, ArgT>>, continuation<ArgT>
 	{
 		task_continuation(F &&from, queue &continue_on);
 
-		virtual void begin(const std::shared_ptr< const async_result<ArgT> > &antecedant_result) override;
+		virtual void begin(const std::shared_ptr< const async_result<ArgT> > &antecedent_result) override;
 
 	private:
 		F _callback;
@@ -97,11 +69,11 @@ namespace tasker
 	template <typename T>
 	struct task_unwrap : task_node<T>, continuation< task<T> >, continuation<T>
 	{
-		virtual void begin(const std::shared_ptr< const async_result< task<T> > > &antecedant_result) override
-		{	(**antecedant_result)->then(std::static_pointer_cast<task_unwrap>(this->shared_from_this()));	}
+		virtual void begin(const std::shared_ptr< const async_result< task<T> > > &antecedent_result) override
+		{	(**antecedent_result)->then(std::static_pointer_cast<task_unwrap>(this->shared_from_this()));	}
 
-		virtual void begin(const std::shared_ptr< const async_result<T> > &antecedant_result) override
-		{	this->set_result([&] (async_result<T> &r) {	r = *antecedant_result;	});	}
+		virtual void begin(const std::shared_ptr< const async_result<T> > &antecedent_result) override
+		{	this->set_result([&] (async_result<T> &r) {	r = *antecedent_result;	});	}
 	};
 
 
@@ -133,27 +105,28 @@ namespace tasker
 
 
 	template <typename T>
-	inline task<T>::task(std::shared_ptr< task_node<T> > &&node)
-		: std::shared_ptr< task_node<T> >(std::forward< std::shared_ptr< task_node<T> > >(node))
+	inline task<T>::task(typename task_node<T>::ptr &&node)
+		: task_node<T>::ptr(std::forward<typename task_node<T>::ptr>(node))
 	{	}
 
 	template <typename T>
 	template <typename F>
-	inline task<typename task_result<F, T>::type> task<T>::then(F &&continuation_callback, queue &continue_on)
+	inline task<detail::invoke_result_t<F, T>> task<T>::then(F &&continuation_callback,
+		queue &continue_on) const
 	{
 		auto c = std::make_shared< task_continuation<F, T> >(std::forward<F>(continuation_callback), continue_on);
 
 		(*this)->then(c);
-		return task<typename task_result<F, T>::type>(std::move(c));
+		return task<detail::invoke_result_t<F, T>>(std::move(c));
 	}
 
 	template <typename T>
-	inline task<typename unwrapped_result<T>::type> task<T>::unwrap()
+	inline task<detail::unwrapped_result_t<T>> task<T>::unwrap()
 	{
-		auto c = std::make_shared< task_unwrap<typename unwrapped_result<T>::type> >();
+		auto c = std::make_shared< task_unwrap<detail::unwrapped_result_t<T>> >();
 
 		(*this)->then(c);
-		return task<typename unwrapped_result<T>::type>(std::move(c));
+		return task<detail::unwrapped_result_t<T>>(std::move(c));
 	}
 
 
@@ -178,9 +151,9 @@ namespace tasker
 
 
 	template <typename F>
-	inline task<typename invoke_result_0<F>::type> schedule_task(F &&task_callback, queue &run_on)
+	inline task<detail::invoke_result_t<F>> schedule_task(F &&task_callback, queue &run_on)
 	{
-		typedef typename invoke_result_0<F>::type task_type;
+		typedef detail::invoke_result_t<F> task_type;
 
 		auto r = std::make_shared< task_root<task_type, F> >(std::forward<F>(task_callback));
 

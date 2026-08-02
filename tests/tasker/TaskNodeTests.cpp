@@ -28,8 +28,8 @@ namespace tasker
 					: F(from)
 				{	}
 
-				virtual void begin(const shared_ptr< const async_result<T> > &antecedant) override
-				{	(*this)(*antecedant);	}
+				virtual void begin(const shared_ptr< const async_result<T> > &antecedent) override
+				{	(*this)(*antecedent);	}
 			};
 
 			template <typename F, typename ArgT>
@@ -259,7 +259,7 @@ namespace tasker
 			{
 				struct dummy : continuation<void>
 				{
-					virtual void begin(const shared_ptr< const async_result<void> > &/*antecedant*/) override
+					virtual void begin(const shared_ptr< const async_result<void> > &/*antecedent*/) override
 					{	}
 				};
 
@@ -277,6 +277,14 @@ namespace tasker
 				// ASSERT
 				assert_equal(1, child1.use_count());
 				assert_equal(1, child2.use_count());
+			}
+		end_test_suite
+
+
+		begin_test_suite( WhenAllTests )
+			test( WhenAllActAsSimpleContinuation )
+			{
+				
 			}
 		end_test_suite
 	}

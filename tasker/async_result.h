@@ -41,7 +41,7 @@ namespace tasker
 		void set(T &&from);
 
 		template <typename E>
-		void fail(const E &exception);
+		void fail(E &&exception);
 		void fail(std::exception_ptr &&exception);
 
 		const T &operator *() const;
@@ -115,7 +115,7 @@ namespace tasker
 
 	template <typename T>
 	template <typename E>
-	inline void async_result<T>::fail(const E &exception)
+	inline void async_result<T>::fail(E &&exception)
 	{
 		auto e = exception;
 

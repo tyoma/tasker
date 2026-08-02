@@ -18,24 +18,26 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 
-#pragma once
+#include <tasker/scheduler.h>
 
-#include <functional>
-#include <memory>
-#include <mt/chrono.h>
+#include <stdexcept>
+
+using namespace std;
 
 namespace tasker
 {
-	struct queue
+	namespace
 	{
-		typedef std::function<mt::milliseconds ()> clock;
+		struct no_queue_ : queue
+		{
+			virtual void schedule(function<void ()> &&task, mt::milliseconds defer_by)
+			{
+				if (defer_by.count()) 
+					throw logic_error("cannot execute a deferred task immediately");
+				task();
+			}
+		} no_queue;
+	}
 
-		virtual void schedule(std::function<void ()> &&task, mt::milliseconds defer_by = mt::milliseconds(0)) = 0;
-
-	protected:
-		virtual ~queue() {	}
-	};
-
-
-	extern queue &immediate;
+	queue &immediate = no_queue;
 }

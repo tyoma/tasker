@@ -2,9 +2,7 @@ name: Build / Test
 
 on:
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    branches: '*'
 
 env:
   BUILD_TYPE: Release
@@ -13,7 +11,7 @@ jobs:
   build:
     permissions: write-all
     runs-on: ${{ matrix.config.os }}
-    strategy:
+    strategy:   
       matrix:
         config:
           - os: ubuntu-latest

@@ -183,7 +183,7 @@ namespace tasker
 			}
 
 
-			test( ResultOfRootAntecedantIsDeliveredToContinuations )
+			test( ResultOfRootAntecedentIsDeliveredToContinuations )
 			{
 				// INIT
 				vector< pair<int, int> > obtained1;
@@ -231,7 +231,7 @@ namespace tasker
 			}
 
 
-			test( ResultOfIntermediateAntecedantIsDeliveredToContinuations )
+			test( ResultOfIntermediateAntecedentIsDeliveredToContinuations )
 			{
 				// INIT
 				vector< pair<int, int> > obtained1;

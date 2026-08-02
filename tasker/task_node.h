@@ -33,7 +33,7 @@ namespace tasker
 	{
 		typedef std::shared_ptr<continuation> ptr;
 
-		virtual void begin(const std::shared_ptr< const async_result<T> > &antecedant) = 0;
+		virtual void begin(const std::shared_ptr< const async_result<T> > &antecedent) = 0;
 
 	protected:
 		virtual ~continuation() {	}
@@ -50,7 +50,7 @@ namespace tasker
 		void then(const continuation_ptr &continuation_);
 
 		template <typename E>
-		void fail(const E& exception);
+		void fail(E &&exception);
 		void fail(std::exception_ptr &&exception);
 
 	protected:
@@ -66,12 +66,14 @@ namespace tasker
 	template <typename T>
 	struct task_node : public task_node_base<T>
 	{
+		typedef std::shared_ptr<task_node> ptr;
 		void set(T &&result);
 	};
 
 	template <>
 	struct task_node<void> : public task_node_base<void>
 	{
+		typedef std::shared_ptr<task_node> ptr;
 		void set();
 	};
 
@@ -87,8 +89,8 @@ namespace tasker
 
 	template <typename T>
 	template <typename E>
-	inline void task_node_base<T>::fail(const E &exception)
-	{	set_result([&] (result_type &r) {	r.fail(exception);	});	}
+	inline void task_node_base<T>::fail(E &&exception)
+	{	set_result([&] (result_type &r) {	r.fail(std::forward<E>(exception));	});	}
 
 	template <typename T>
 	inline void task_node_base<T>::fail(std::exception_ptr &&exception)
