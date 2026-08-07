@@ -172,7 +172,7 @@ namespace tasker
 
 		end_test_suite
 
-		begin_test_suite( ATaskAlgorithmWhenAllTests )
+		begin_test_suite( TaskAlgorithmWhenAllTests )
 			template <typename T>
 			static task<T> from_node(const shared_ptr<task_node<T>> &from)
 			{	return task<T>(typename task_node<T>::ptr(from));	}
