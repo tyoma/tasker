@@ -33,7 +33,9 @@ elseif(UNIX)
 endif()
 
 add_library(mt STATIC ${MT_SOURCES})
+target_include_directories(mt PUBLIC ../..)
 target_compile_definitions(mt PUBLIC $<$<BOOL:${TASKER_USE_STD_MT}>:TASKER_USE_STD_MT>)
 
 add_library(mt.thread_callbacks OBJECT ${MT_THREAD_SOURCES})
-target_compile_definitions(mt.thread_callbacks PUBLIC $<$<BOOL:${TASKER_USE_STD_MT}>:TASKER_USE_STD_MT>)
+target_include_directories(mt PUBLIC ../..)
+target_link_libraries(mt.thread_callbacks PRIVATE mt)

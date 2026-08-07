@@ -11,9 +11,9 @@ namespace tasker
 	{
 		shared_ptr<mt::event> this_thread::open()
 		{
-			shared_ptr<mt::event> exited(new mt::event(false, false));
+			auto exited = make_shared<mt::event>(false, false);
 
-			mt::get_thread_callbacks().at_thread_exit(bind(&mt::event::set, exited));
+			mt::get_thread_callbacks().at_thread_exit([exited] {	exited->set();	});
 			return exited;
 		}
 	}

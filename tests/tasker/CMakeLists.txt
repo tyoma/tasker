@@ -44,5 +44,5 @@ if (NOT WIN32)
 endif()
 
 add_library(tasker.tests SHARED ${TASKER_TEST_SOURCES})
-target_link_libraries(tasker.tests tasker mt $<TARGET_OBJECTS:mt.thread_callbacks>)
+target_link_libraries(tasker.tests tasker $<TARGET_OBJECTS:mt.thread_callbacks>)
 add_utee_test(tasker.tests)

@@ -17,6 +17,8 @@ namespace tasker
 		typedef std::unique_ptr<T, reclaimer> pool_ptr;
 
 	public:
+		~object_pool();
+
 		static std::shared_ptr<object_pool> construct(std::size_t limit);
 		pool_ptr allocate();
 
@@ -28,7 +30,7 @@ namespace tasker
 	private:
 		mt::mutex _mtx;
 		std::size_t _remaining;
-		std::vector<std::unique_ptr<T>> _pool;
+		std::vector<T *> _pool;
 	};
 
 	template <typename T>
@@ -50,13 +52,20 @@ namespace tasker
 
 
 	template <typename T>
-	inline std::shared_ptr<object_pool<T>> object_pool<T>::construct(std::size_t limit)
-	{	return std::shared_ptr<object_pool>(new object_pool(limit));	}
-
-	template <typename T>
 	inline object_pool<T>::object_pool(std::size_t limit)
 		: _remaining(limit)
 	{	}
+
+	template <typename T>
+	inline object_pool<T>::~object_pool()
+	{
+		for (auto object : _pool)
+			delete object;
+	}
+
+	template <typename T>
+	inline std::shared_ptr<object_pool<T>> object_pool<T>::construct(std::size_t limit)
+	{	return std::shared_ptr<object_pool>(new object_pool(limit));	}
 
 	template <typename T>
 	inline typename object_pool<T>::pool_ptr object_pool<T>::allocate()
@@ -65,7 +74,7 @@ namespace tasker
 
 		if (!_pool.empty())
 		{
-			auto pooled = _pool.back().release();
+			auto pooled = _pool.back();
 
 			_pool.pop_back();
 			return pool_ptr(pooled, reclaimer(this->shared_from_this()));
@@ -84,7 +93,7 @@ namespace tasker
 	inline void object_pool<T>::reclaim(T *object) noexcept
 	{
 		mt::lock_guard<mt::mutex> lock(_mtx);
-		_pool.push_back(std::unique_ptr<T>(object));
+		_pool.push_back(object);
 	}
 
 

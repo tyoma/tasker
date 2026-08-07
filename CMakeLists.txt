@@ -13,30 +13,25 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/_lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/_bin)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/_bin)
 
-include_directories(${CMAKE_CURRENT_LIST_DIR})
-
 set(MSVC_COMPILER_OPTIONS -wd4503;-wd4996;-wd4510;-wd4610;-wd4512;-wd4312;-wd4481;-wd4355)
-set(MSVC_COMPILER_OPTIONS ${MSVC_COMPILER_OPTIONS} -MP;-W4;-GR-;-GS-;-Gy;-Zi)
+set(MSVC_COMPILER_OPTIONS ${MSVC_COMPILER_OPTIONS} -MP;-W4;-Zi)
 set(MSVC_COMPILER_OPTIONS_DEBUG ${MSVC_COMPILER_OPTIONS})
-set(MSVC_COMPILER_OPTIONS_RELEASE_MAX -Ox;-Ob2;-Oi;-Ot;-Oy)
+set(MSVC_COMPILER_OPTIONS_RELEASE_MAX ${MSVC_COMPILER_OPTIONS} -Ox;-Ob2;-Oi;-Ot;-Oy)
 
 add_compile_options(
 	"$<$<CXX_COMPILER_ID:MSVC>:$<$<CONFIG:Debug>:${MSVC_COMPILER_OPTIONS_DEBUG}>>"
 	"$<$<CXX_COMPILER_ID:MSVC>:$<$<CONFIG:Release,RelWithDebInfo>:${MSVC_COMPILER_OPTIONS_RELEASE_MAX}>>"
-	"$<$<CXX_COMPILER_ID:MSVC>:$<$<EQUAL:4,${CMAKE_SIZEOF_VOID_P}>:-arch:SSE2>>"
 	"$<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-fPIC;-Wpedantic;-Wall;-Wno-unknown-pragmas;-std=c++11>"
+	"$<$<PLATFORM_ID:Linux>:-pthread>"
 )
-if (UNIX)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
-endif ()
 
-add_link_options("$<$<CXX_COMPILER_ID:GNU>:-Wl,--no-undefined;-Wl,--gc-sections>")
-							
+add_link_options(
+	"$<$<CXX_COMPILER_ID:MSVC>:-DEBUG:FULL>"
+	"$<$<CXX_COMPILER_ID:GNU>:-Wl,--no-undefined;-Wl,--gc-sections>"
+)
+
 add_subdirectory(src/mt)
 add_subdirectory(src/tasker)
-
-target_include_directories(mt INTERFACE .)
-target_include_directories(tasker INTERFACE .)
 
 if (NOT TASKER_NO_TESTS)
 	if (NOT TARGET utee)

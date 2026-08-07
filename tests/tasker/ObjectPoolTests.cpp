@@ -167,6 +167,36 @@ namespace tasker
 				// ASSERT
 				assert_equal(2, destroyed);
 			}
+
+
+			test( PooledObjectsAreNotDestroyedUntilTheLastPooledObjectIsReleased )
+			{
+				// INIT
+				auto p = object_pool<my_object>::construct(4);
+				auto o1 = p->allocate();
+				auto o2 = p->allocate();
+				auto o3 = p->allocate();
+				auto destroyed = 0;
+
+				o1->on_destroy = [&] { destroyed++; };
+				o2->on_destroy = [&] { destroyed++; };
+				o3->on_destroy = [&] { destroyed++; };
+
+				p = nullptr;
+
+				// ACT
+				o1 = nullptr;
+				o2 = nullptr;
+
+				// ASSERT
+				assert_equal(0, destroyed);
+
+				// ACT
+				o3 = nullptr;
+
+				// ASSERT
+				assert_equal(3, destroyed);
+			}
 		end_test_suite
 	}
 }
