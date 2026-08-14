@@ -39,7 +39,7 @@ namespace tasker
 		template <typename F>
 		task<detail::invoke_result_t<F, T>> then(F &&continuation_callback, queue &continue_on) const;
 
-		task<detail::unwrapped_result_t<T>> unwrap();
+		task<detail::unwrapped_result_t<T>> unwrap() const;
 
 	private:
 		template <typename T2>
@@ -121,7 +121,7 @@ namespace tasker
 	}
 
 	template <typename T>
-	inline task<detail::unwrapped_result_t<T>> task<T>::unwrap()
+	inline task<detail::unwrapped_result_t<T>> task<T>::unwrap() const
 	{
 		auto c = std::make_shared< task_unwrap<detail::unwrapped_result_t<T>> >();
 
