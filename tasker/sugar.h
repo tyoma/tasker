@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include "exception.h"
+#include "lifetime.h"
 #include "task.h"
 #include "task_algorithm.h"
 #include "type_traits.h"
@@ -31,6 +33,21 @@ namespace tasker
 	enum go_t { go };
 	enum unwrap_t { unwrap };
 
+	template <typename F, typename E>
+	struct protected_call
+	{
+		template <typename... T>
+		detail::invoke_result_t<F, T &&...> operator ()(T &&...args)
+		{
+			return lifetime->if_alive(underlying, [] {
+				return callback_dead_exception();
+			}, std::forward<T>(args)...);
+		}
+
+		F underlying;
+		std::shared_ptr<basic_lifetime<E>> lifetime;
+	};
+
 	template <typename C>
 	inline std::tuple<C &&, queue &> next(C &&callback, queue &execute_on)
 	{	return std::tuple<C&&, queue&>(std::forward<C>(callback), execute_on);	}
@@ -39,8 +56,13 @@ namespace tasker
 	inline std::tuple<C &&, queue &> operator /(C &&callback, queue &execute_on)
 	{	return next(std::forward<C>(callback), execute_on);	}
 
+	template <typename C, typename E>
+	inline protected_call<C, E> operator /(C &&callback, const std::shared_ptr<basic_lifetime<E>> &lifetime_)
+	{	return protected_call<C, E> {	std::forward<C>(callback), lifetime_ };	}
+
 	template <typename T, typename C>
-	inline task<detail::invoke_result_t<C, T>> operator >>(const task<T> &lhs, std::tuple<C &&, queue &> &&continuation)
+	inline task<detail::invoke_result_t<C, const async_result<T> &>> operator >>(const task<T> &lhs,
+		std::tuple<C &&, queue &> &&continuation)
 	{	return lhs.then(std::forward<C>(std::get<0>(continuation)), std::get<1>(continuation));	}
 
 	template <typename T>
@@ -50,7 +72,7 @@ namespace tasker
 	namespace detail
 	{
 		template <typename C, typename... T, std::size_t... I>
-		inline task<invoke_result_t<C, T...>> when_all_from_tuple(const std::tuple<task<T>...> &tasks,
+		inline task<invoke_result_t<C, const async_result<T> &...>> when_all_from_tuple(const std::tuple<task<T>...> &tasks,
 			std::tuple<C &&, queue &> &&continuation, index_sequence<I...>)
 		{
 			return when_all(std::forward<C>(std::get<0>(continuation)), std::get<1>(continuation),
@@ -69,7 +91,7 @@ namespace tasker
 	}
 
 	template <typename C, typename... T>
-	inline task<detail::invoke_result_t<C, T...>> operator >>(const std::tuple<task<T>...> &lhs,
+	inline task<detail::invoke_result_t<C, const async_result<T> &...>> operator >>(const std::tuple<task<T>...> &lhs,
 		std::tuple<C &&, queue &> &&continuation)
 	{
 		return detail::when_all_from_tuple(lhs, std::move(continuation),

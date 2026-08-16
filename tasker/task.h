@@ -37,7 +37,7 @@ namespace tasker
 		explicit task(typename task_node<T>::ptr &&node);
 
 		template <typename F>
-		task<detail::invoke_result_t<F, T>> then(F &&continuation_callback, queue &continue_on) const;
+		task<detail::invoke_result_t<F, const async_result<T> &>> then(F &&continuation_callback, queue &continue_on) const;
 
 		task<detail::unwrapped_result_t<T>> unwrap() const;
 
@@ -55,7 +55,7 @@ namespace tasker
 	};
 
 	template <typename F, typename ArgT>
-	struct task_continuation : task_node<detail::invoke_result_t<F, ArgT>>, continuation<ArgT>
+	struct task_continuation : task_node<detail::invoke_result_t<F, const async_result<ArgT> &>>, continuation<ArgT>
 	{
 		task_continuation(F &&from, queue &continue_on);
 
@@ -111,13 +111,13 @@ namespace tasker
 
 	template <typename T>
 	template <typename F>
-	inline task<detail::invoke_result_t<F, T>> task<T>::then(F &&continuation_callback,
+	inline task<detail::invoke_result_t<F, const async_result<T> &>> task<T>::then(F &&continuation_callback,
 		queue &continue_on) const
 	{
 		auto c = std::make_shared< task_continuation<F, T> >(std::forward<F>(continuation_callback), continue_on);
 
 		(*this)->then(c);
-		return task<detail::invoke_result_t<F, T>>(std::move(c));
+		return task<detail::invoke_result_t<F, const async_result<T> &>>(std::move(c));
 	}
 
 	template <typename T>

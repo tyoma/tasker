@@ -365,6 +365,48 @@ namespace no_a_tasker // Made intentionally to verify Koenig lookup is working.
 				assert_equal(314, value);
 			}
 
+
+			test( EquippingAFunctionWithLifetimeBlockGeneratesANewFunctionThatThrowsWhenLifetimeEnds )
+			{
+				struct noop_event
+				{
+					void set() {	}
+					void wait() {	}
+				};
+
+				// INIT
+				auto called_1 = 0;
+				auto called_2 = 0;
+				auto l = tasker::make_lifetime(noop_event());
+
+				// INIT / ACT
+				auto f1 = [&] {	called_1++;	} / l;
+				auto f2 = [&] (int value) {	return called_2++, value * 3;	} / l;
+
+				// ACT
+				f1();
+
+				// ASSERT
+				assert_equal(1, called_1);
+
+				// ACT / ASSERT
+				assert_equal(15, f2(5));
+
+				// ASSERT
+				assert_equal(1, called_2);
+
+				// ACT
+				l->end();
+
+				// ACT / ASSERT
+				assert_throws(f1(),tasker::callback_dead_exception);
+				assert_throws(f2(7),tasker::callback_dead_exception);
+
+				// ASSERT
+				assert_equal(1, called_1);
+				assert_equal(1, called_2);
+			}
+
 		end_test_suite
 	}
 }

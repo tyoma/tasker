@@ -20,53 +20,24 @@
 
 #include <tasker/private_queue.h>
 
-#include <mt/mutex.h>
-#include <mt/thread.h>
 #include <tasker/scheduler.h>
 
 using namespace std;
 
 namespace tasker
 {
-	struct private_queue::control_block
-	{
-		control_block()
-			: alive(true)
-		{	}
-
-		mt::recursive_mutex mutex;
-		bool alive;
-	};
-
-	struct private_worker_queue::control_block
-	{
-		control_block()
-			: alive(true)
-		{	}
-
-		mt::mutex mutex;
-		bool alive;
-	};
-
-
 	private_queue::private_queue(queue &apartment_queue)
-		: _apartment_queue(apartment_queue), _control_block(make_shared<control_block>())
+		: _apartment_queue(apartment_queue), _lifetime(make_lifetime())
 	{	}
 
 	private_queue::~private_queue()
-	{
-		mt::lock_guard<mt::recursive_mutex> l(_control_block->mutex);
-		_control_block->alive = false;
-	}
+	{	_lifetime->end();	}
 
 	void private_queue::schedule(function<void ()> &&task, mt::milliseconds defer_by)
 	{
-		auto cb = _control_block;
-		function<void ()> captured([task, cb] {
-			mt::lock_guard<mt::recursive_mutex> l(cb->mutex);
-
-			if (cb->alive)
-				task();
+		auto l = _lifetime;
+		function<void ()> captured([task, l] {
+			l->try_if_alive(task);
 		});
 
 		task = function<void ()>();
@@ -75,42 +46,32 @@ namespace tasker
 
 
 	private_worker_queue::private_worker_queue(queue &worker_queue, queue &apartment_queue)
-		: _worker_queue(worker_queue), _apartment_queue(apartment_queue), _control_block(make_shared<control_block>())
+		: _worker_queue(worker_queue), _apartment_queue(apartment_queue), _lifetime(make_lifetime())
 	{	}
 
 	private_worker_queue::~private_worker_queue()
-	{
-		mt::lock_guard<mt::mutex> lock(_control_block->mutex);
-
-		_control_block->alive = false;
-	}
+	{	_lifetime->end();	}
 
 	void private_worker_queue::schedule(async_task &&task)
 	{
-		auto cb = _control_block;
-		function<void ()> wrapped_task([this, task, cb] {
-			mt::lock_guard<mt::mutex> lock(cb->mutex);
+		auto l = _lifetime;
 
-			if (cb->alive)
-			{
+		_worker_queue.schedule([this, task, l] {
+			l->try_if_alive([this, &task] {
 				completion c(*this);
 
 				task(c);
-			}
+			});
 		});
-
-		_worker_queue.schedule(std::move(wrapped_task));
 	}
 
 	void private_worker_queue::deliver(function<void ()> &&progress)
 	{
-		auto cb = _control_block;
-		function<void ()> wrapped_progress([progress, cb] {
-			if (cb->alive)
-				progress();
-		});
+		auto l = _lifetime;
 
-		_apartment_queue.schedule(std::move(wrapped_progress));
+		_apartment_queue.schedule([progress, l] {
+			l->try_if_alive(progress);
+		});
 	}
 
 

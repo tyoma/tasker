@@ -21,16 +21,16 @@
 #pragma once
 
 #include "chrono.h"
-#include "noncopyable.h"
 
 #include <memory>
 
 namespace mt
 {
-	class event : noncopyable
+	class event
 	{
 	public:
 		event(bool initial = false, bool auto_reset = true);
+		event(event &&other);
 		~event();
 
 		void wait();

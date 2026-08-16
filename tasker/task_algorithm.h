@@ -114,10 +114,10 @@ namespace tasker
 	}
 
 	template <typename F, typename... T>
-	inline task<typename detail::invoke_result_t<F, T...>> when_all(F &&continuation_callback, queue &queue_,
+	inline task<typename detail::invoke_result_t<F, const async_result<T> &...>> when_all(F &&continuation_callback, queue &queue_,
 		const task<T> &...tasks)
 	{
-		typedef detail::invoke_result_t<F, T...> result_type;
+		typedef detail::invoke_result_t<F, const async_result<T> &...> result_type;
 		typedef detail::when_all_completion<result_type, F, T...> state_type;
 
 		auto completion = std::make_shared<state_type>(std::forward<F>(continuation_callback), queue_);

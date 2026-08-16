@@ -20,8 +20,9 @@
 
 #pragma once
 
+#include "lifetime.h"
+
 #include <functional>
-#include <memory>
 #include <mt/chrono.h>
 
 namespace tasker
@@ -37,15 +38,12 @@ namespace tasker
 		void schedule(std::function<void ()> &&task, mt::milliseconds defer_by = mt::milliseconds(0));
 
 	private:
-		struct control_block;
-
-	private:
 		private_queue(const private_queue &other);
 		void operator =(const private_queue &rhs);
 
 	private:
 		queue &_apartment_queue;
-		std::shared_ptr<control_block> _control_block;
+		const std::shared_ptr<lifetime> _lifetime;
 	};
 
 
@@ -63,9 +61,6 @@ namespace tasker
 		void schedule(async_task &&task);
 
 	private:
-		struct control_block;
-
-	private:
 		private_worker_queue(const private_worker_queue &other);
 		void operator =(const private_worker_queue &rhs);
 
@@ -73,7 +68,7 @@ namespace tasker
 
 	private:
 		queue &_worker_queue, &_apartment_queue;
-		const std::shared_ptr<control_block> _control_block;
+		const std::shared_ptr<lifetime> _lifetime;
 
 	private:
 		friend class completion;

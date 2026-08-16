@@ -81,6 +81,10 @@ namespace mt
 		: _impl(new impl(initial, auto_reset))
 	{	}
 
+	event::event(event &&other)
+		: _impl(std::move(other._impl))
+	{	}
+
 	event::~event()
 	{	}
 

@@ -4,6 +4,7 @@ include(utee-test)
 
 set(TASKER_TEST_SOURCES
 	AsyncResultTests.cpp
+	LifetimeBlockTests.cpp
 	ObjectPoolTests.cpp
 	PrivateQueueTests.cpp
 	SugarTests.cpp
