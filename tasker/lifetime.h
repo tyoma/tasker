@@ -27,9 +27,9 @@ namespace tasker
 
 	public:
 		template <typename F, typename... T>
-		void try_if_alive(const F &method, T&& ...args);
+		void try_if_alive(F &&method, T&& ...args);
 		template <typename F, typename EF, typename... T>
-		detail::invoke_result_t<F, T ...> if_alive(const F &method, const EF &exception_factory, T&& ...args);
+		detail::invoke_result_t<F, T ...> if_alive(F &&method, EF &&exception_factory, T&& ...args);
 		void end();
 
 	private:
@@ -67,7 +67,7 @@ namespace tasker
 	{	return std::shared_ptr<basic_lifetime<E>>(new basic_lifetime<E>(std::forward<E>(event)));	}
 
 	inline std::shared_ptr<lifetime> make_lifetime()
-	{	return std::shared_ptr<lifetime>(new lifetime(std::move(mt::event())));	}
+	{	return std::shared_ptr<lifetime>(new lifetime(mt::event()));	}
 
 
 	template <typename E>
@@ -77,7 +77,7 @@ namespace tasker
 
 	template <typename E>
 	template <typename F, typename... T>
-	inline void basic_lifetime<E>::try_if_alive(const F &method, T&&... args)
+	inline void basic_lifetime<E>::try_if_alive(F &&method, T&&... args)
 	{
 		for (scope_lock lock = {	*this	}; lock.enter(); )
 			return method(std::forward<T>(args)...);
@@ -85,7 +85,7 @@ namespace tasker
 
 	template <typename E>
 	template <typename F, typename EF, typename... T>
-	inline detail::invoke_result_t<F, T ...> basic_lifetime<E>::if_alive(const F &method, const EF &exception_factory, T&&... args)
+	inline detail::invoke_result_t<F, T ...> basic_lifetime<E>::if_alive(F &&method, EF &&exception_factory, T&&... args)
 	{
 		for (scope_lock lock = {	*this	}; lock.enter(); )
 			return method(std::forward<T>(args)...);
