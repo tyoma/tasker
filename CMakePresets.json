@@ -1,0 +1,190 @@
+{
+	"version": 6,
+	"configurePresets": [
+		{
+			"name": "base",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/_build.${presetName}"
+		},
+		{
+			"name": "macos-arm64-debug",
+			"displayName": "macOS ARM64 Debug",
+			"inherits": "base",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug"
+			}
+		},
+		{
+			"name": "macos-arm64-release",
+			"displayName": "macOS ARM64 Release",
+			"inherits": "base",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release"
+			}
+		},
+		{
+			"name": "macos-x86_64-debug",
+			"displayName": "macOS x86_64 Debug",
+			"inherits": "base",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug"
+			}
+		},
+		{
+			"name": "macos-x86_64-release",
+			"displayName": "macOS x86_64 Release",
+			"inherits": "base",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release"
+			}
+		},
+		{
+			"name": "windows-x86_64-msvc-14-debug",
+			"displayName": "Windows x86_64 Debug (MSVC 14.0)",
+			"inherits": "base",
+			"generator": "Visual Studio 14 2015",
+			"architecture": "x64",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"CMAKE_CONFIGURATION_TYPES": "Debug"
+			}
+		},
+		{
+			"name": "windows-x86_64-msvc-14-release",
+			"displayName": "Windows x86_64 Release (MSVC 14.0)",
+			"inherits": "base",
+			"generator": "Visual Studio 14 2015",
+			"architecture": "x64",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release",
+				"CMAKE_CONFIGURATION_TYPES": "Release"
+			}
+		},
+		{
+			"name": "windows-x86_64-msvc-17-debug",
+			"displayName": "Windows x86_64 Debug (MSVC 17.0)",
+			"inherits": "base",
+			"generator": "Visual Studio 17 2022",
+			"architecture": "x64",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"CMAKE_CONFIGURATION_TYPES": "Debug"
+			}
+		},
+		{
+			"name": "windows-x86_64-msvc-17-release",
+			"displayName": "Windows x86_64 Release (MSVC 17.0)",
+			"inherits": "base",
+			"generator": "Visual Studio 17 2022",
+			"architecture": "x64",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release",
+				"CMAKE_CONFIGURATION_TYPES": "Release"
+			}
+		},
+		{
+			"name": "windows-x86_64-debug",
+			"displayName": "Windows x86_64 Debug",
+			"inherits": "base",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"CMAKE_CONFIGURATION_TYPES": "Debug"
+			}
+		},
+		{
+			"name": "windows-x86_64-release",
+			"displayName": "Windows x86_64 Release",
+			"inherits": "base",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release",
+				"CMAKE_CONFIGURATION_TYPES": "Release"
+			}
+		}
+	],
+	"buildPresets": [
+		{
+			"name": "macos-arm64-debug",
+			"displayName": "macOS ARM64 Debug",
+			"configurePreset": "macos-arm64-debug"
+		},
+		{
+			"name": "macos-arm64-release",
+			"displayName": "macOS ARM64 Release",
+			"configurePreset": "macos-arm64-release"
+		},
+		{
+			"name": "macos-x86_64-debug",
+			"displayName": "macOS x86_64 Debug",
+			"configurePreset": "macos-x86_64-debug"
+		},
+		{
+			"name": "macos-x86_64-release",
+			"displayName": "macOS x86_64 Release",
+			"configurePreset": "macos-x86_64-release"
+		},
+		{
+			"name": "windows-x86_64-debug",
+			"displayName": "Windows x86_64 Debug",
+			"configurePreset": "windows-x86_64-debug",
+			"configuration": "Debug"
+		},
+		{
+			"name": "windows-x86_64-release",
+			"displayName": "Windows x86_64 Release",
+			"configurePreset": "windows-x86_64-release",
+			"configuration": "Release"
+		}
+	],
+	"testPresets": [
+		{
+			"name": "macos-arm64-debug",
+			"displayName": "macOS ARM64 Debug",
+			"configurePreset": "macos-arm64-debug",
+			"output": {
+				"outputOnFailure": true
+			}
+		},
+		{
+			"name": "macos-arm64-release",
+			"displayName": "macOS ARM64 Release",
+			"configurePreset": "macos-arm64-release",
+			"output": {
+				"outputOnFailure": true
+			}
+		},
+		{
+			"name": "macos-x86_64-debug",
+			"displayName": "macOS x86_64 Debug",
+			"configurePreset": "macos-x86_64-debug",
+			"output": {
+				"outputOnFailure": true
+			}
+		},
+		{
+			"name": "macos-x86_64-release",
+			"displayName": "macOS x86_64 Release",
+			"configurePreset": "macos-x86_64-release",
+			"output": {
+				"outputOnFailure": true
+			}
+		},
+		{
+			"name": "windows-x86_64-debug",
+			"displayName": "Windows x86_64 Debug",
+			"configurePreset": "windows-x86_64-debug",
+			"configuration": "Debug",
+			"output": {
+				"outputOnFailure": true
+			}
+		},
+		{
+			"name": "windows-x86_64-release",
+			"displayName": "Windows x86_64 Release",
+			"configurePreset": "windows-x86_64-release",
+			"configuration": "Release",
+			"output": {
+				"outputOnFailure": true
+			}
+		}
+	]
+}

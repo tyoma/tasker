@@ -23,6 +23,7 @@
 #include <functional>
 #include <memory>
 #include <mt/chrono.h>
+#include <stdexcept>
 
 namespace tasker
 {
@@ -36,6 +37,18 @@ namespace tasker
 		virtual ~queue() {	}
 	};
 
+	struct serial_queue : queue
+	{
+	};
 
-	extern queue &immediate;
+
+	static struct : queue
+	{
+		virtual void schedule(std::function<void ()> &&task, mt::milliseconds defer_by)
+		{
+			if (defer_by.count()) 
+				throw std::logic_error("cannot execute a deferred task immediately");
+			task();
+		}
+	} immediate;
 }

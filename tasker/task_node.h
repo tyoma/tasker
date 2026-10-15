@@ -21,29 +21,18 @@
 #pragma once
 
 #include "async_result.h"
+#include "continuation.h"
 
-#include <memory>
 #include <mt/mutex.h>
 #include <vector>
 
 namespace tasker
 {
 	template <typename T>
-	struct continuation
-	{
-		typedef std::shared_ptr<continuation> ptr;
-
-		virtual void begin(const std::shared_ptr< const async_result<T> > &antecedent) = 0;
-
-	protected:
-		virtual ~continuation() {	}
-	};
-
-	template <typename T>
 	class task_node_base : public std::enable_shared_from_this< task_node_base<T> >
 	{
 	public:
-		typedef typename continuation<T>::ptr continuation_ptr;
+		typedef typename continuation<const async_result<T>>::ptr continuation_ptr;
 		typedef async_result<T> result_type;
 
 	public:
@@ -90,7 +79,7 @@ namespace tasker
 	template <typename T>
 	template <typename E>
 	inline void task_node_base<T>::fail(E &&exception)
-	{	set_result([&] (result_type &r) {	r.fail(std::forward<E>(exception));	});	}
+	{	set_result([&] (result_type &r) {	r.fail(std::make_exception_ptr(std::forward<E>(exception)));	});	}
 
 	template <typename T>
 	inline void task_node_base<T>::fail(std::exception_ptr &&exception)

@@ -22,7 +22,7 @@ namespace tasker
 			}
 
 			template <typename T, typename F>
-			struct continuation_impl : continuation<T>, F
+			struct continuation_impl : continuation< const async_result<T> >, F
 			{
 				continuation_impl(const F &from)
 					: F(from)
@@ -41,7 +41,7 @@ namespace tasker
 			};
 
 			template <typename T, typename F>
-			typename continuation<T>::ptr make_continuation(const F &f)
+			typename continuation< const async_result<T> >::ptr make_continuation(const F &f)
 			{	return make_shared< continuation_impl<T, F> >(f);	}
 		}
 
@@ -257,7 +257,7 @@ namespace tasker
 
 			test( ContinuationsAreReleasedUponSettingTheResult )
 			{
-				struct dummy : continuation<void>
+				struct dummy : continuation< const async_result<void> >
 				{
 					virtual void begin(const shared_ptr< const async_result<void> > &/*antecedent*/) override
 					{	}

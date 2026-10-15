@@ -20,16 +20,13 @@
 
 #pragma once
 
+#include "forward_result.h"
 #include "scheduler.h"
 #include "task_node.h"
 #include "type_traits.h"
 
 namespace tasker
 {
-	struct cancelled : std::exception
-	{
-	};
-
 	template <typename T>
 	class task : task_node<T>::ptr
 	{
@@ -40,68 +37,8 @@ namespace tasker
 		task<detail::invoke_result_t<F, const async_result<T> &>> then(F &&continuation_callback, queue &continue_on) const;
 
 		task<detail::unwrapped_result_t<T>> unwrap() const;
-
-	private:
-		template <typename T2>
-		friend struct task_unwrap;
 	};
 
-	template <typename T, typename F>
-	struct task_root : task_node<T>
-	{
-		task_root(F &&from);
-
-		typename std::remove_reference<F>::type callback;
-	};
-
-	template <typename F, typename ArgT>
-	struct task_continuation : task_node<detail::invoke_result_t<F, const async_result<ArgT> &>>, continuation<ArgT>
-	{
-		task_continuation(F &&from, queue &continue_on);
-
-		virtual void begin(const std::shared_ptr< const async_result<ArgT> > &antecedent_result) override;
-
-	private:
-		F _callback;
-		queue &_continue_on;
-	};
-
-	template <typename T>
-	struct task_unwrap : task_node<T>, continuation< task<T> >, continuation<T>
-	{
-		virtual void begin(const std::shared_ptr< const async_result< task<T> > > &antecedent_result) override
-		{	(**antecedent_result)->then(std::static_pointer_cast<task_unwrap>(this->shared_from_this()));	}
-
-		virtual void begin(const std::shared_ptr< const async_result<T> > &antecedent_result) override
-		{	this->set_result([&] (async_result<T> &r) {	r = *antecedent_result;	});	}
-	};
-
-
-
-	template <typename T, typename F>
-	inline void handle_exception(task_node<T> &target, F &&f)
-	{
-		try
-		{	f();	}
-		catch (...)
-		{	target.fail(std::current_exception());	}
-	}
-
-	template <typename T, typename CallbackT>
-	inline void set_result(task_node<T> &target, CallbackT &callback)
-	{	handle_exception(target, [&] {	target.set(callback());	});	}
-
-	template <typename CallbackT>
-	inline void set_result(task_node<void> &target, CallbackT &callback)
-	{	handle_exception(target, [&] {	callback(), target.set();	});	}
-
-	template <typename T, typename CallbackT, typename A>
-	inline void set_result(task_node<T> &target, CallbackT &callback, A &antecedent)
-	{	handle_exception(target, [&] {	target.set(callback(antecedent));	});	}
-
-	template <typename CallbackT, typename A>
-	inline void set_result(task_node<void> &target, CallbackT &callback, A &antecedent)
-	{	handle_exception(target, [&] {	callback(antecedent), target.set();	});	}
 
 
 	template <typename T>
@@ -114,7 +51,28 @@ namespace tasker
 	inline task<detail::invoke_result_t<F, const async_result<T> &>> task<T>::then(F &&continuation_callback,
 		queue &continue_on) const
 	{
-		auto c = std::make_shared< task_continuation<F, T> >(std::forward<F>(continuation_callback), continue_on);
+		struct task_continuation : task_node<detail::invoke_result_t<F, const async_result<T> &>>,
+			continuation<const async_result<T>>
+		{
+			task_continuation(F &&from, queue &continue_on)
+				: _callback(std::forward<F>(from)), _continue_on(continue_on)
+			{	}
+
+			virtual void begin(const std::shared_ptr< const async_result<T> > &antecedent_result) override
+			{
+				auto self = std::static_pointer_cast<task_continuation>(this->shared_from_this());
+
+				_continue_on.schedule([antecedent_result, self] {
+					forward_result<tasker::task_node>(*self, self->_callback, *antecedent_result);
+				});
+			}
+
+		private:
+			F _callback;
+			queue &_continue_on;
+		};
+
+		auto c = std::make_shared<task_continuation>(std::forward<F>(continuation_callback), continue_on);
 
 		(*this)->then(c);
 		return task<detail::invoke_result_t<F, const async_result<T> &>>(std::move(c));
@@ -123,30 +81,18 @@ namespace tasker
 	template <typename T>
 	inline task<detail::unwrapped_result_t<T>> task<T>::unwrap() const
 	{
-		auto c = std::make_shared< task_unwrap<detail::unwrapped_result_t<T>> >();
+		using U = detail::unwrapped_result_t<T>;
 
-		(*this)->then(c);
-		return task<detail::unwrapped_result_t<T>>(std::move(c));
-	}
+		auto c = std::make_shared<task_node<U>>();
 
-
-	template <typename T, typename F>
-	inline task_root<T, F>::task_root(F &&from)
-		: callback(std::forward<F>(from))
-	{	}
-
-
-	template <typename F, typename ArgT>
-	inline task_continuation<F, ArgT>::task_continuation(F &&from, queue &continue_on)
-		: _callback(std::forward<F>(from)), _continue_on(continue_on)
-	{	}
-
-	template <typename F, typename ArgT>
-	inline void task_continuation<F, ArgT>::begin(const std::shared_ptr< const async_result<ArgT> > &result)
-	{
-		auto self = std::static_pointer_cast<task_continuation>(this->shared_from_this());
-
-		_continue_on.schedule([result, self] {	tasker::set_result(*self, self->_callback, *result);	});
+		then([c] (const async_result<T> &rr) {
+			(*rr).then([c] (const async_result<U> &r) {
+				forward_result<tasker::task_node>(*c, [] (const async_result<U> &result) {
+					return *result;
+				}, r);
+			}, immediate);
+		}, immediate);
+		return task<U>(std::move(c));
 	}
 
 
@@ -155,9 +101,18 @@ namespace tasker
 	{
 		typedef detail::invoke_result_t<F> task_type;
 
-		auto r = std::make_shared< task_root<task_type, F> >(std::forward<F>(task_callback));
+		struct task_root : task_node<task_type>
+		{
+			task_root(F &&from)
+				: callback(std::forward<F>(from))
+			{	}
 
-		run_on.schedule([r] {	tasker::set_result(*r, r->callback);	});
+			typename std::remove_reference<F>::type callback;
+		};
+
+		auto r = std::make_shared<task_root>(std::forward<F>(task_callback));
+
+		run_on.schedule([r] {	forward_result<tasker::task_node>(*r, r->callback);	});
 		return task<task_type>(std::move(r));
 	}
 }

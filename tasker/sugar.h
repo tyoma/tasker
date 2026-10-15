@@ -30,8 +30,16 @@
 
 namespace tasker
 {
-	enum go_t { go };
-	enum unwrap_t { unwrap };
+	const struct
+	{
+		template <typename C>
+		task<detail::invoke_result_t<C>> operator >>(std::tuple<C &&, queue &> &&continuation) const
+		{	return schedule_task(std::forward<C>(std::get<0>(continuation)), std::get<1>(continuation));	}
+	} go;
+
+	const struct unwrap_t
+	{
+	} unwrap;
 
 	template <typename F, typename E>
 	struct protected_call
@@ -97,10 +105,6 @@ namespace tasker
 		return detail::when_all_from_tuple(lhs, std::move(continuation),
 			typename detail::make_index_sequence<sizeof...(T)>::type());
 	}
-
-	template <typename C>
-	inline task<detail::invoke_result_t<C>> operator >>(go_t, std::tuple<C &&, queue &> &&continuation)
-	{	return schedule_task(std::forward<C>(std::get<0>(continuation)), std::get<1>(continuation));	}
 
 	template <typename T1, typename T2>
 	inline std::tuple<task<T1>, task<T2>> operator &(task<T1> &&lhs, task<T2> &&rhs)

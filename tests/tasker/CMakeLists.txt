@@ -12,6 +12,8 @@ set(TASKER_TEST_SOURCES
 	TaskAlgorithmTests.cpp
 	TaskNodeTests.cpp
 	TaskTests.cpp
+	ValueTaskNodeTests.cpp
+	ValueTaskTests.cpp
 	TaskQueueTests.cpp
 	../test-helpers/src/thread.cpp
 )

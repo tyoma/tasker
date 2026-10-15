@@ -38,9 +38,9 @@ namespace tasker
 		struct invoke_result
 		{
 			template <typename U>
-			static U value();
+			static U declval();
 
-			typedef decltype(value<F>()(value<ArgT>()...)) type;
+			typedef decltype(declval<F>()(declval<ArgT>()...)) type;
 		};
 
 		template< class F, class... ArgTypes >
