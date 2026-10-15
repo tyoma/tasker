@@ -113,8 +113,6 @@ namespace tasker
 				r1.fail(make_exception(1928));
 				r2.fail(make_exception(e2));
 				r3.fail(make_exception(e3));
-				r4.fail(13131);
-				r5.fail(string("loremIpsum"));
 
 				// ACT
 				try
@@ -155,32 +153,6 @@ namespace tasker
 				// ASSERT
 					assert_equal(e3, value);
 				}
-
-				// ACT
-				try
-				{
-					*r4;
-					assert_is_false(true);
-				}
-				catch (int value)
-				{
-
-				// ASSERT
-					assert_equal(13131, value);
-				}
-
-				// ACT
-				try
-				{
-					*r5;
-					assert_is_false(true);
-				}
-				catch (const string &value)
-				{
-
-				// ASSERT
-					assert_equal("loremIpsum", value);
-				}
 			}
 
 
@@ -189,23 +161,15 @@ namespace tasker
 				// INIT
 				const auto f = make_shared<bool>();
 				unique_ptr< async_result<int> > r1(new async_result<int>());
-				unique_ptr< async_result<int> > r2(new async_result<int>());
 
 				// ACT
 				r1->fail(make_exception(f));
-				r2->fail(f);
-
-				// ASSERT
-				assert_is_true(f.use_count() > 2);
-
-				// ACT
-				r1.reset();
 
 				// ASSERT
 				assert_equal(2, f.use_count());
 
 				// ACT
-				r2.reset();
+				r1.reset();
 
 				// ASSERT
 				assert_equal(1, f.use_count());
@@ -225,7 +189,6 @@ namespace tasker
 				assert_throws(with_exception.set(2), logic_error);
 				assert_throws(with_value.fail(make_exception("bbb")), logic_error);
 				assert_throws(with_exception.fail(make_exception("ccc")), logic_error);
-				assert_throws(with_exception.fail("ccc"), logic_error);
 			}
 
 
@@ -402,7 +365,6 @@ namespace tasker
 				assert_throws(with_exception.set(), logic_error);
 				assert_throws(with_value.fail(make_exception("bbb")), logic_error);
 				assert_throws(with_exception.fail(make_exception("ccc")), logic_error);
-				assert_throws(with_exception.fail("ccc"), logic_error);
 			}
 		end_test_suite
 	}

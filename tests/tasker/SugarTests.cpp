@@ -48,7 +48,7 @@ namespace no_a_tasker // Made intentionally to verify Koenig lookup is working.
 				assert_equal(1, called);
 
 				// ACT
-				task<double> t2 = completed_v_task >> next([&](const async_result<void> &) {
+				task<double> t2 = completed_v_task >> next([&] (const async_result<void> &) {
 					++called;
 					return 1.14;
 				}, immediate);

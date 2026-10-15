@@ -40,9 +40,9 @@ namespace tasker
 			{	}
 
 			template <std::size_t I, typename T2>
-			void set_result(const async_result<T2> &result)
+			void set_result(T2 &&result)
 			{
-				std::get<I>(_result) = result;
+				std::get<I>(_result) = std::forward<T2>(result);
 				if (1 == _remaining.fetch_add(-1, mt::memory_order_acq_rel))
 				{
 					auto self = std::static_pointer_cast<when_all_completion>(this->shared_from_this());
@@ -58,7 +58,7 @@ namespace tasker
 					return invoke(typename make_index_sequence<sizeof...(T)>::type());
 				};
 
-				tasker::set_result(static_cast< task_node<ResultT> & >(*this), callback);
+				forward_result<tasker::task_node>(static_cast< task_node<ResultT> & >(*this), callback);
 			}
 
 			template <std::size_t... I>

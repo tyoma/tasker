@@ -27,7 +27,7 @@
 
 namespace tasker
 {
-	class thread_queue : public queue
+	class thread_queue : public serial_queue
 	{
 	public:
 		thread_queue(const clock &clock_);

@@ -43,42 +43,4 @@ namespace tasker
 		task = function<void ()>();
 		_apartment_queue.schedule(std::move(captured), defer_by);
 	}
-
-
-	private_worker_queue::private_worker_queue(queue &worker_queue, queue &apartment_queue)
-		: _worker_queue(worker_queue), _apartment_queue(apartment_queue), _lifetime(make_lifetime())
-	{	}
-
-	private_worker_queue::~private_worker_queue()
-	{	_lifetime->end();	}
-
-	void private_worker_queue::schedule(async_task &&task)
-	{
-		auto l = _lifetime;
-
-		_worker_queue.schedule([this, task, l] {
-			l->try_if_alive([this, &task] {
-				completion c(*this);
-
-				task(c);
-			});
-		});
-	}
-
-	void private_worker_queue::deliver(function<void ()> &&progress)
-	{
-		auto l = _lifetime;
-
-		_apartment_queue.schedule([progress, l] {
-			l->try_if_alive(progress);
-		});
-	}
-
-
-	private_worker_queue::completion::completion(private_worker_queue &owner)
-		: _owner(owner)
-	{	}
-
-	void private_worker_queue::completion::deliver(function<void ()> &&progress)
-	{	_owner.deliver(std::move(progress));	}
 }

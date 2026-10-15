@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.13)
 
 set(TASKER_SOURCES
-	no_queue.cpp
 	private_queue.cpp
 	task_queue.cpp
 	thread_queue.cpp
