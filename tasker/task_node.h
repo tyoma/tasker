@@ -1,124 +1,118 @@
-//	Copyright (c) 2011-2023 by Artem A. Gevorkyan (gevorkyan.org)
-//
-//	Permission is hereby granted, free of charge, to any person obtaining a copy
-//	of this software and associated documentation files (the "Software"), to deal
-//	in the Software without restriction, including without limitation the rights
-//	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-//	copies of the Software, and to permit persons to whom the Software is
-//	furnished to do so, subject to the following conditions:
-//
-//	The above copyright notice and this permission notice shall be included in
-//	all copies or substantial portions of the Software.
-//
-//	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-//	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-//	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-//	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-//	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-//	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-//	THE SOFTWARE.
-
 #pragma once
 
 #include "async_result.h"
+#include "continuation.h"
+#include "forward_result.h"
 
-#include <memory>
-#include <mt/mutex.h>
-#include <vector>
+#include <mt/atomic.h>
+#include <stdexcept>
 
 namespace tasker
 {
 	template <typename T>
-	struct continuation
-	{
-		typedef std::shared_ptr<continuation> ptr;
-
-		virtual void begin(const std::shared_ptr< const async_result<T> > &antecedent) = 0;
-
-	protected:
-		virtual ~continuation() {	}
-	};
-
-	template <typename T>
-	class task_node_base : public std::enable_shared_from_this< task_node_base<T> >
+	class task_node : public std::enable_shared_from_this< task_node<T> >
 	{
 	public:
-		typedef typename continuation<T>::ptr continuation_ptr;
 		typedef async_result<T> result_type;
+		typedef typename continuation<result_type>::ptr continuation_ptr;
+		typedef std::shared_ptr<task_node> ptr;
 
 	public:
-		void then(const continuation_ptr &continuation_);
+		task_node();
+
+		template <typename U>
+		void set(U &&result);
+		void set();
 
 		template <typename E>
 		void fail(E &&exception);
 		void fail(std::exception_ptr &&exception);
+
+		void then(const continuation_ptr &continuation_);
 
 	protected:
 		template <typename F>
 		void set_result(F &&result_setter);
 
 	private:
-		mt::mutex _mtx;
+		typedef unsigned int state_type;
+
+		enum : state_type
+		{
+			callback_claimed_increment = 0x00000001u,
+			callback_claimed_mask = 0x00007fffu,
+			result_claimed_increment = 0x00008000u,
+			result_claimed_mask = 0x3fff8000u,
+			callback_ready = 0x40000000u,
+			result_ready = 0x80000000u
+		};
+
+	private:
+		void claim(state_type increment, state_type mask, const char *error_message);
+		void dispatch(state_type set, state_type check);
+
+	private:
+		mt::atomic<state_type> _state;
 		result_type _result;
-		std::vector<continuation_ptr> _continuations;
-	};
-
-	template <typename T>
-	struct task_node : public task_node_base<T>
-	{
-		typedef std::shared_ptr<task_node> ptr;
-		void set(T &&result);
-	};
-
-	template <>
-	struct task_node<void> : public task_node_base<void>
-	{
-		typedef std::shared_ptr<task_node> ptr;
-		void set();
+		continuation_ptr _continuation;
 	};
 
 
 
 	template <typename T>
-	inline void task_node_base<T>::then(const continuation_ptr &continuation_)
-	{
-		for (mt::lock_guard<mt::mutex> l(_mtx); _result.state() == async_in_progress; )
-			return _continuations.push_back(continuation_);
-		continuation_->begin(std::shared_ptr<const result_type>(this->shared_from_this(), &_result));
-	}
+	inline task_node<T>::task_node()
+		: _state(0)
+	{	}
+
+	template <typename T>
+	template <typename U>
+	inline void task_node<T>::set(U &&result)
+	{	set_result([&] (result_type &r) {	r.set(std::forward<U>(result));	});	}
+
+	template <typename T>
+	inline void task_node<T>::set()
+	{	set_result([] (result_type &r) {	r.set();	});	}
 
 	template <typename T>
 	template <typename E>
-	inline void task_node_base<T>::fail(E &&exception)
-	{	set_result([&] (result_type &r) {	r.fail(std::forward<E>(exception));	});	}
+	inline void task_node<T>::fail(E &&exception)
+	{	set_result([&] (result_type &r) {	r.fail(std::make_exception_ptr(std::forward<E>(exception)));	});	}
 
 	template <typename T>
-	inline void task_node_base<T>::fail(std::exception_ptr &&exception)
+	inline void task_node<T>::fail(std::exception_ptr &&exception)
 	{	set_result([&] (result_type &r) {	r.fail(std::forward<std::exception_ptr>(exception));	});	}
 
 	template <typename T>
-	template <typename F>
-	inline void task_node_base<T>::set_result(F &&result_setter)
+	inline void task_node<T>::then(const continuation_ptr &continuation_)
 	{
-		{
-			mt::lock_guard<mt::mutex> l(_mtx);
-
-			result_setter(_result); // State: async_in_progress -> async_completed/async_faulted.
-		}
-
-		auto result = std::shared_ptr<const result_type>(this->shared_from_this(), &_result);
-
-		for (auto i = std::begin(_continuations); i != std::end(_continuations); ++i)
-			(*i)->begin(result);
-		_continuations.clear();
+		claim(callback_claimed_increment, callback_claimed_mask, "a value continuation has already been registered");
+		_continuation = continuation_;
+		dispatch(callback_ready, result_ready);
 	}
 
+	template <typename T>
+	template <typename F>
+	inline void task_node<T>::set_result(F &&result_setter)
+	{
+		claim(result_claimed_increment, result_claimed_mask, "a value or exception has already been set");
+		trap_exception(_result, [&] {	result_setter(_result);	});
+		dispatch(result_ready, callback_ready);
+	}
 
 	template <typename T>
-	inline void task_node<T>::set(T &&result)
-	{	this->set_result([&] (typename task_node<T>::result_type &r) {	r.set(std::forward<T>(result));	});	}
+	inline void task_node<T>::claim(state_type increment, state_type mask, const char *error_message)
+	{
+		if (_state.fetch_add(increment, mt::memory_order_relaxed) & mask)
+			throw std::logic_error(error_message);
+	}
 
-
-	inline void task_node<void>::set()
-	{	this->set_result([] (result_type &r) {	r.set();	});	}
+	template <typename T>
+	inline void task_node<T>::dispatch(state_type set, state_type check)
+	{
+		if (_state.fetch_add(set, mt::memory_order_acq_rel) & check)
+		{
+			auto c = std::move(_continuation);
+			c->begin(std::shared_ptr<result_type>(this->shared_from_this(), &_result));
+		}
+	}
 }

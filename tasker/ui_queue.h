@@ -25,7 +25,7 @@
 
 namespace tasker
 {
-	class ui_queue : public queue
+	class ui_queue : public serial_queue
 	{
 	public:
 		ui_queue(const clock &clock_);

@@ -22,7 +22,7 @@
 
 #include "exception.h"
 #include "lifetime.h"
-#include "task.h"
+#include "shared_task.h"
 #include "task_algorithm.h"
 #include "type_traits.h"
 
@@ -30,8 +30,16 @@
 
 namespace tasker
 {
-	enum go_t { go };
-	enum unwrap_t { unwrap };
+	const struct
+	{
+		template <typename C>
+		shared_task<detail::invoke_result_t<C>> operator >>(std::tuple<C &&, queue &> &&continuation) const
+		{	return schedule_task(std::forward<C>(std::get<0>(continuation)), std::get<1>(continuation));	}
+	} go;
+
+	const struct unwrap_t
+	{
+	} unwrap;
 
 	template <typename F, typename E>
 	struct protected_call
@@ -61,18 +69,18 @@ namespace tasker
 	{	return protected_call<C, E> {	std::forward<C>(callback), lifetime_ };	}
 
 	template <typename T, typename C>
-	inline task<detail::invoke_result_t<C, const async_result<T> &>> operator >>(const task<T> &lhs,
+	inline shared_task<detail::invoke_result_t<C, const async_result<T> &>> operator >>(const shared_task<T> &lhs,
 		std::tuple<C &&, queue &> &&continuation)
 	{	return lhs.then(std::forward<C>(std::get<0>(continuation)), std::get<1>(continuation));	}
 
 	template <typename T>
-	inline task<T> operator >>(task<task<T>> &&lhs, unwrap_t)
+	inline shared_task<T> operator >>(shared_task<shared_task<T>> &&lhs, unwrap_t)
 	{	return lhs.unwrap();	}
 
 	namespace detail
 	{
 		template <typename C, typename... T, std::size_t... I>
-		inline task<invoke_result_t<C, const async_result<T> &...>> when_all_from_tuple(const std::tuple<task<T>...> &tasks,
+		inline shared_task<invoke_result_t<C, const async_result<T> &...>> when_all_from_tuple(const std::tuple<shared_task<T>...> &tasks,
 			std::tuple<C &&, queue &> &&continuation, index_sequence<I...>)
 		{
 			return when_all(std::forward<C>(std::get<0>(continuation)), std::get<1>(continuation),
@@ -80,41 +88,37 @@ namespace tasker
 		}
 
 		template <typename T1, typename... T2, std::size_t... I>
-		inline std::tuple<task<T1>, task<T2>...> prepend_task(task<T1> &&lhs, std::tuple<task<T2>...> &&rhs,
+		inline std::tuple<shared_task<T1>, shared_task<T2>...> prepend_task(shared_task<T1> &&lhs, std::tuple<shared_task<T2>...> &&rhs,
 			index_sequence<I...>)
-		{	return std::tuple<task<T1>, task<T2>...>(std::move(lhs), std::get<I>(std::move(rhs))...);	}
+		{	return std::tuple<shared_task<T1>, shared_task<T2>...>(std::move(lhs), std::get<I>(std::move(rhs))...);	}
 
 		template <typename T2, typename... T1, std::size_t... I>
-		inline std::tuple<task<T1>..., task<T2>> append_task(std::tuple<task<T1>...> &&lhs, task<T2> &&rhs,
+		inline std::tuple<shared_task<T1>..., shared_task<T2>> append_task(std::tuple<shared_task<T1>...> &&lhs, shared_task<T2> &&rhs,
 			index_sequence<I...>)
-		{	return std::tuple<task<T1>..., task<T2>>(std::get<I>(std::move(lhs))..., std::move(rhs));	}
+		{	return std::tuple<shared_task<T1>..., shared_task<T2>>(std::get<I>(std::move(lhs))..., std::move(rhs));	}
 	}
 
 	template <typename C, typename... T>
-	inline task<detail::invoke_result_t<C, const async_result<T> &...>> operator >>(const std::tuple<task<T>...> &lhs,
+	inline shared_task<detail::invoke_result_t<C, const async_result<T> &...>> operator >>(const std::tuple<shared_task<T>...> &lhs,
 		std::tuple<C &&, queue &> &&continuation)
 	{
 		return detail::when_all_from_tuple(lhs, std::move(continuation),
 			typename detail::make_index_sequence<sizeof...(T)>::type());
 	}
 
-	template <typename C>
-	inline task<detail::invoke_result_t<C>> operator >>(go_t, std::tuple<C &&, queue &> &&continuation)
-	{	return schedule_task(std::forward<C>(std::get<0>(continuation)), std::get<1>(continuation));	}
-
 	template <typename T1, typename T2>
-	inline std::tuple<task<T1>, task<T2>> operator &(task<T1> &&lhs, task<T2> &&rhs)
+	inline std::tuple<shared_task<T1>, shared_task<T2>> operator &(shared_task<T1> &&lhs, shared_task<T2> &&rhs)
 	{	return { std::move(lhs), std::move(rhs) };	}
 
 	template <typename T1, typename... T2>
-	inline std::tuple<task<T1>, task<T2>...> operator &(task<T1> &&lhs, std::tuple<task<T2>...> &&rhs)
+	inline std::tuple<shared_task<T1>, shared_task<T2>...> operator &(shared_task<T1> &&lhs, std::tuple<shared_task<T2>...> &&rhs)
 	{
 		return detail::prepend_task(std::move(lhs), std::move(rhs),
 			typename detail::make_index_sequence<sizeof...(T2)>::type());
 	}
 
 	template <typename T2, typename... T1>
-	inline std::tuple<task<T1>..., task<T2>> operator &(std::tuple<task<T1>...> &&lhs, task<T2> &&rhs)
+	inline std::tuple<shared_task<T1>..., shared_task<T2>> operator &(std::tuple<shared_task<T1>...> &&lhs, shared_task<T2> &&rhs)
 	{
 		return detail::append_task(std::move(lhs), std::move(rhs),
 			typename detail::make_index_sequence<sizeof...(T1)>::type());

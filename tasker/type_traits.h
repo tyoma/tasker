@@ -5,6 +5,9 @@
 namespace tasker
 {
 	template <typename T>
+	class shared_task;
+
+	template <typename T>
 	class task;
 
 	namespace detail
@@ -12,6 +15,10 @@ namespace tasker
 		template <typename T>
 		struct unwrapped_result
 		{	typedef void type;	};
+
+		template <typename T>
+		struct unwrapped_result< shared_task<T> >
+		{	typedef T type;	};
 
 		template <typename T>
 		struct unwrapped_result< task<T> >
@@ -38,9 +45,9 @@ namespace tasker
 		struct invoke_result
 		{
 			template <typename U>
-			static U value();
+			static U declval();
 
-			typedef decltype(value<F>()(value<ArgT>()...)) type;
+			typedef decltype(declval<F>()(declval<ArgT>()...)) type;
 		};
 
 		template< class F, class... ArgTypes >

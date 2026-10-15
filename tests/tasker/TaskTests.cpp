@@ -2,9 +2,11 @@
 
 #include "mocks.h"
 #include "../test-helpers/helpers.h"
-#include "../test-helpers/thread.h"
 
-#include <queue>
+#include <memory>
+#include <mt/event.h>
+#include <mt/thread.h>
+#include <stdexcept>
 #include <ut/assert.h>
 #include <ut/test.h>
 
@@ -14,14 +16,7 @@ namespace tasker
 {
 	namespace tests
 	{
-		namespace
-		{
-			template <typename T>
-			T copy(const T &from)
-			{	return T(from);	}
-		}
-
-		begin_test_suite( TaskTests )
+		begin_test_suite( ATaskTests )
 			mocks::queue queues[2];
 
 			test( RunningATaskSchedulesOneOnTheQueuePassed )
@@ -30,8 +25,8 @@ namespace tasker
 				vector<int> called(2);
 
 				// INIT / ACT
-				auto t1 = schedule_task([&] {	return called[0]++, 18;	}, queues[0]);
-				auto t2 = schedule_task([&] {	return called[1]++, 181;	}, queues[1]);
+				auto t1 = schedule_value_task([&] {	return called[0]++, 18;	}, queues[0]);
+				auto t2 = schedule_value_task([&] {	return called[1]++, 181;	}, queues[1]);
 
 				// ASSERT
 				assert_equal(1u, queues[0].tasks.size());
@@ -58,333 +53,216 @@ namespace tasker
 			test( ContinuationsAreScheduledWhenAntecedentIsComplete )
 			{
 				// INIT
-				auto t1 = schedule_task([&] {	return 18;	}, queues[0]);
-				auto t2 = schedule_task([&] {	return 1;	}, queues[1]);
+				vector<int> order;
 
-				// ACT
-				t1.then([&] (const async_result<int> &) {	return string();	}, queues[0]);
-				t1.then([&] (const async_result<int> &) {	return 17;	}, queues[1]);
-				t2.then([&] (const async_result<int> &) {	return string();	}, queues[1]);
-				t2.then([&] (const async_result<int> &) {	return 17.19;	}, queues[1]);
-				t2.then([&] (const async_result<int> &) {	return plural + 1 + 19;	}, queues[0]);
+				// INIT / ACT
+				schedule_value_task([&] {
+					order.push_back(1);
+					return 18;
+				}, queues[0]).then([&] (async_result<int> &&) {
+					order.push_back(2);
+					return string("lorem ipsum");
+				}, queues[0]).then([&] (async_result<string> &&) {
+					order.push_back(3);
+					return 123.45;
+				}, queues[0]);
 
 				// ASSERT
 				assert_equal(1u, queues[0].tasks.size());
+				assert_is_empty(order);
+
+				// ACT
+				queues[0].run_one();
+
+				// ASSERT
+				assert_equal(1u, queues[0].tasks.size());
+				assert_equal(plural + 1, order);
+
+				// ACT
+				queues[0].run_one();
+
+				// ASSERT
+				assert_equal(1u, queues[0].tasks.size());
+				assert_equal(plural + 1 + 2, order);
+
+				// ACT
+				queues[0].run_one();
+
+				// ASSERT
+				assert_is_empty(queues[0].tasks);
+				assert_equal(plural + 1 + 2 + 3, order);
+			}
+
+
+			test( RootAndContinuationRunOnTheirQueuesAndTransferValueOwnership )
+			{
+				// INIT
+				unique_ptr<string> obtained;
+				auto root_called = false;
+
+				// INIT / ACT
+				auto next = schedule_value_task([&] { root_called = true; return string("lorem"); }, queues[0])
+					.then([&] (async_result<string> &&result) {
+						return unique_ptr<string>(new string(std::move(*result)));
+					}, queues[1])
+					.then([&] (async_result<unique_ptr<string>> &&result) { obtained = std::move(*result); }, queues[0]);
+
+				// ASSERT
+				assert_is_false(root_called);
+				assert_is_empty(queues[1].tasks);
+				assert_equal(1u, queues[0].tasks.size());
+
+				// ACT
+				queues[0].run_one();
+
+				// ASSERT
+				assert_is_true(root_called);
 				assert_equal(1u, queues[1].tasks.size());
+				assert_is_empty(queues[0].tasks);
 
 				// ACT
-				queues[0].run_one();
+				queues[1].run_one();
 
 				// ASSERT
 				assert_equal(1u, queues[0].tasks.size());
-				assert_equal(2u, queues[1].tasks.size());
+				assert_is_true(!obtained);
 
 				// ACT
-				queues[1].run_one();
+				queues[0].run_one();
 
 				// ASSERT
-				assert_equal(2u, queues[0].tasks.size());
-				assert_equal(3u, queues[1].tasks.size());
+				assert_equal("lorem", *obtained);
+				assert_is_empty(queues[0].tasks);
 			}
 
 
-			test( ContinuationCallbacksAreCalledInRespectiveQueue )
+			test( RootExceptionIsDeliveredToValueContinuation )
 			{
 				// INIT
-				vector<int> called(5);
-				auto t1 = schedule_task([&] {	return 18;	}, queues[0]);
-				auto t2 = schedule_task([&] {	return 1;	}, queues[1]);
+				auto caught = 0;
 
-				t1.then([&] (const async_result<int> &) {	return called[0]++, string();	}, queues[0]);
-				t1.then([&] (const async_result<int> &) {	return called[1]++, 17;	}, queues[1]);
-				t2.then([&] (const async_result<int> &) {	return called[2]++, string();	}, queues[1]);
-				t2.then([&] (const async_result<int> &) {	return called[3]++, 17.19;	}, queues[1]);
-				t2.then([&] (const async_result<int> &) {	return called[4]++, plural + 1 + 19;	}, queues[0]);
-
-				// ACT
-				queues[1].run_one();
-				queues[0].run_one();
-
-				// ASSERT
-				assert_equal(plural + 0 + 0 + 0 + 0 + 0, called);
+				// INIT / ACT
+				schedule_value_task([] () -> int { throw 13; }, queues[0])
+					.then([&] (async_result<int> &&result) {
+						try
+						{ *result; }
+						catch (int value)
+						{ caught = value; }
+					}, queues[1]);
 
 				// ACT
 				queues[0].run_one();
-
-				// ASSERT
-				assert_equal(plural + 0 + 0 + 0 + 0 + 1, called);
-
-				// ACT
-				queues[0].run_one();
-
-				// ASSERT
-				assert_equal(plural + 1 + 0 + 0 + 0 + 1, called);
-				assert_is_empty(queues[0].tasks);
-
-				// ACT
-				queues[1].run_one();
 				queues[1].run_one();
 
 				// ASSERT
-				assert_equal(plural + 1 + 0 + 1 + 1 + 1, called);
-
-				// ACT
-				queues[1].run_one();
-
-				// ASSERT
-				assert_equal(plural + 1 + 1 + 1 + 1 + 1, called);
+				assert_equal(13, caught);
 				assert_is_empty(queues[0].tasks);
 				assert_is_empty(queues[1].tasks);
 			}
 
 
-			test( ChainedContinuationsAreCalledSequentially )
+			test( ContinuationRegisteredAfterCompletionIsScheduled )
 			{
 				// INIT
-				vector<int> called(4);
+				auto node = make_shared<task_node<int>>();
+				task<int> task(node);
+				auto obtained = 0;
 
 				// INIT / ACT
-				schedule_task([&] {	return called[0]++, 18;	}, queues[0])
-					.then([&] (const async_result<int> &) {	return called[1]++, string("lorem ipsum");	}, queues[1])
-					.then([&] (const async_result<string> &) {	return called[2]++, 1.1;	}, queues[0])
-					.then([&] (const async_result<double> &) {	return called[3]++, 0;	}, queues[0]);
-
-				// ACT
-				queues[0].run_one();
+				node->set(31);
+				std::move(task).then([&] (async_result<int> &&result) { obtained = *std::move(result); }, queues[0]);
 
 				// ASSERT
-				assert_equal(plural + 1 + 0 + 0 + 0, called);
-				assert_is_empty(queues[0].tasks);
-				assert_equal(1u, queues[1].tasks.size());
-
-				// ACT
-				queues[1].run_one();
-
-				// ASSERT
-				assert_equal(plural + 1 + 1 + 0 + 0, called);
 				assert_equal(1u, queues[0].tasks.size());
-				assert_is_empty(queues[1].tasks);
 
 				// ACT
 				queues[0].run_one();
 
 				// ASSERT
-				assert_equal(plural + 1 + 1 + 1 + 0, called);
-				assert_equal(1u, queues[0].tasks.size());
-				assert_is_empty(queues[1].tasks);
-
-				// ACT
-				queues[0].run_one();
-
-				// ASSERT
-				assert_equal(plural + 1 + 1 + 1 + 1, called);
+				assert_equal(31, obtained);
 				assert_is_empty(queues[0].tasks);
-				assert_is_empty(queues[1].tasks);
 			}
 
 
-			test( ResultOfRootAntecedentIsDeliveredToContinuations )
+			test( ConcurrentCompletionAndContinuationRegistrationScheduleOnce )
 			{
 				// INIT
-				vector< pair<int, int> > obtained1;
-				auto s1 = schedule_task([&] {	return 18;	}, queues[0]);
-
-				// INIT / ACT
-				s1.then([&] (const async_result<int> &a) {	return obtained1.push_back(make_pair(0, *a)), 1;	}, queues[0]);
-				s1.then([&] (const async_result<int> &a) {	return obtained1.push_back(make_pair(1, *a)), 1;	}, queues[0]);
+				auto node = make_shared<task_node<int>>();
+				task<int> task(node);
+				mt::event start(false, false);
+				auto obtained = 0;
 
 				// ACT
-				queues[0].run_one();
-				queues[0].run_one();
+				mt::thread setting([&] { start.wait(); node->set(47); });
+				mt::thread registering([&] {
+					start.wait();
+					std::move(task).then([&] (async_result<int> &&result) { obtained = *std::move(result); }, queues[0]);
+				});
+				start.set();
+				setting.join();
+				registering.join();
 
 				// ASSERT
-				assert_equal(plural + make_pair(0, 18), obtained1);
-
-				// ACT
-				queues[0].run_one();
-
-				// ASSERT
-				assert_equal(plural + make_pair(0, 18) + make_pair(1, 18), obtained1);
-
-				// INIT
-				vector< pair<int, string> > obtained2;
-				auto s2 = schedule_task([&] {	return string("lorem");	}, queues[0]);
-
-				// INIT / ACT
-				s2.then([&] (const async_result<string> &a) {	return obtained2.push_back(make_pair(0, *a)), 1;	}, queues[0]);
-				s2.then([&] (const async_result<string> &a) {	return obtained2.push_back(make_pair(1, *a)), 1;	}, queues[0]);
-				s2.then([&] (const async_result<string> &a) {	return obtained2.push_back(make_pair(2, *a)), 1;	}, queues[0]);
-
-				// ACT
-				queues[0].run_one();
-				queues[0].run_one();
-				queues[0].run_one();
-
-				// ASSERT
-				assert_equal(plural + make_pair(0, string("lorem")) + make_pair(1, string("lorem")), obtained2);
+				assert_equal(1u, queues[0].tasks.size());
 
 				// ACT
 				queues[0].run_one();
 
 				// ASSERT
-				assert_equal(plural + make_pair(0, string("lorem")) + make_pair(1, string("lorem")) + make_pair(2, string("lorem")), obtained2);
+				assert_equal(47, obtained);
+				assert_is_empty(queues[0].tasks);
 			}
 
 
-			test( ResultOfIntermediateAntecedentIsDeliveredToContinuations )
+			test( VoidTasksAndContinuationExceptionsPropagateThroughValueChain )
 			{
 				// INIT
-				vector< pair<int, int> > obtained1;
-				auto s1 = schedule_task([] {	return 18;	}, queues[0])
-					.then([] (const async_result<int> &) {	return 13;	}, queues[0]);
-
-				// INIT / ACT
-				s1.then([&] (const async_result<int> &a) {	return obtained1.push_back(make_pair(0, *a)), 1;	}, queues[0]);
-				s1.then([&] (const async_result<int> &a) {	return obtained1.push_back(make_pair(1, *a)), 1;	}, queues[0]);
-
-				// ACT
-				queues[0].run_one();
-				queues[0].run_one();
-				queues[0].run_one();
-
-				// ASSERT
-				assert_equal(plural + make_pair(0, 13), obtained1);
-
-				// ACT
-				queues[0].run_one();
-
-				// ASSERT
-				assert_equal(plural + make_pair(0, 13) + make_pair(1, 13), obtained1);
-
-				// INIT
-				vector< pair<int, string> > obtained2;
-				auto s2 = schedule_task([&] {	return 1;	}, queues[0])
-					.then([] (const async_result<int> &) {	return string("ipsum");	}, queues[0]);
-
-				// INIT / ACT
-				s2.then([&] (const async_result<string> &a) {	return obtained2.push_back(make_pair(0, *a)), 1;	}, queues[0]);
-				s2.then([&] (const async_result<string> &a) {	return obtained2.push_back(make_pair(1, *a)), 1;	}, queues[0]);
-				s2.then([&] (const async_result<string> &a) {	return obtained2.push_back(make_pair(2, *a)), 1;	}, queues[0]);
-
-				// ACT
-				queues[0].run_one();
-				queues[0].run_one();
-				queues[0].run_one();
-				queues[0].run_one();
-
-				// ASSERT
-				assert_equal(plural + make_pair(0, string("ipsum")) + make_pair(1, string("ipsum")), obtained2);
-
-				// ACT
-				queues[0].run_one();
-
-				// ASSERT
-				assert_equal(plural + make_pair(0, string("ipsum")) + make_pair(1, string("ipsum")) + make_pair(2, string("ipsum")), obtained2);
-			}
-
-
-			test( VoidContinuationsMixWellWithNonVoid )
-			{
-				// INIT / ACT
 				auto step = 0;
-				schedule_task([&] {	step = 17;	}, queues[0])
-					.then([&] (const async_result<void> &r) {	return *r, step = 11, 17;	}, queues[1])
-					.then([&] (const async_result<int> &r) {	*r, step = 3;	}, queues[0])
-					.then([&] (const async_result<void> &r) {	*r, step = 5;	}, queues[0]);
 
-				// ASSERT
-				assert_equal(1u, queues[0].tasks.size());
-				assert_equal(0u, queues[1].tasks.size());
-
-				// ACT
-				queues[0].run_one();
-
-				// ASSERT
-				assert_equal(17, step);
-				assert_equal(0u, queues[0].tasks.size());
-				assert_equal(1u, queues[1].tasks.size());
-
-				// ACT
-				queues[1].run_one();
-
-				// ASSERT
-				assert_equal(11, step);
-				assert_equal(1u, queues[0].tasks.size());
-				assert_equal(0u, queues[1].tasks.size());
-
-				// ACT
-				queues[0].run_one();
-
-				// ASSERT
-				assert_equal(3, step);
-				assert_equal(1u, queues[0].tasks.size());
-				assert_equal(0u, queues[1].tasks.size());
-
-				// ACT
-				queues[0].run_one();
-
-				// ASSERT
-				assert_equal(5, step);
-				assert_equal(0u, queues[0].tasks.size());
-				assert_equal(0u, queues[1].tasks.size());
-			}
-
-
-			test( ExceptionThrownByRootCallbackIsDeliveredToContinuation )
-			{
-				// INIT
-				auto called = 0;
-				schedule_task([] {	throw 13;	}, queues[0]).then([&] (const async_result<void> &r) {
-					try
-					{	*r;	}
-					catch (int v)
-					{	assert_equal(13, v);	}
-					called++;
-				}, queues[0]);
-				schedule_task([] () -> string {	throw "lorem";	}, queues[0]).then([&] (const async_result<string> &r) {
-					try
-					{	*r;	}
-					catch (const char *v)
-					{	assert_equal("lorem", string(v));	}
-					called++;
-				}, queues[0]);
+				// INIT / ACT
+				schedule_value_task([&] { step = 17; }, queues[0])
+					.then([&] (async_result<void> &&result) { *std::move(result); step = 11; return 17; }, queues[1])
+					.then([] (async_result<int> &&) -> string { throw 19; }, queues[0])
+					.then([&] (async_result<string> &&result) {
+						try
+						{ *std::move(result); }
+						catch (int value)
+						{ step = value; }
+					}, queues[1]);
 
 				// ACT
 				queues[0].run_till_end();
+				queues[1].run_till_end();
+				queues[0].run_till_end();
+				queues[1].run_till_end();
 
 				// ASSERT
-				assert_equal(2, called);
+				assert_equal(19, step);
+				assert_is_empty(queues[0].tasks);
+				assert_is_empty(queues[1].tasks);
 			}
 
 
-			test( ExceptionThrownByContinuationCallbackIsDeliveredToContinuation )
+			test( OnlyOneContinuationCanConsumeAResult )
 			{
 				// INIT
-				auto called = 0;
-				schedule_task([] {	}, queues[0])
-					.then([] (const async_result<void> &) {	throw 19;	}, queues[0])
-					.then([&] (const async_result<void> &r) {
-						try
-						{	*r;	}
-						catch (int v)
-						{	assert_equal(19, v);	}
-						called++;
-					}, queues[0]);
-				schedule_task([] {	}, queues[0])
-					.then([] (const async_result<void> &) -> string {	throw "amet";	}, queues[0])
-					.then([&] (const async_result<string> &r) {
-						try
-						{	*r;	}
-						catch (const char *v)
-						{	assert_equal("amet", string(v));	}
-						called++;
-					}, queues[0]);
+				auto node = make_shared<task_node<int>>();
+				task<int> first(node);
+				task<int> second(node);
 
 				// ACT
-				queues[0].run_till_end();
+				std::move(first).then([] (async_result<int> &&) { }, queues[0]);
+				try
+				{ std::move(second).then([] (async_result<int> &&) { }, queues[0]); }
+				catch (const logic_error &)
+				{
+					// ASSERT
+					assert_is_true(true);
+					return;
+				}
 
 				// ASSERT
-				assert_equal(2, called);
+				assert_is_true(false);
 			}
 
 
@@ -395,12 +273,14 @@ namespace tasker
 				auto called2 = 0;
 				auto s1 = make_shared< task_node<int> >();
 				auto s2 = make_shared< task_node<void> >();
-				auto t1 = schedule_task([&] {	return task<int>(copy(s1));	}, queues[0]);
-				auto t2 = schedule_task([&] {	return task<void>(copy(s2));	}, queues[0]);
 
 				// ACT
-				t1.unwrap().then([&] (const async_result<int> &r) {	results1.push_back(*r);	}, queues[1]);
-				t2.unwrap().then([&] (const async_result<void> &)  {	called2++;	}, queues[1]);
+				schedule_value_task([&] {	return task<int>(s1);	}, queues[0])
+					.unwrap()
+					.then([&] (async_result<int> &&r) {	results1.push_back(*r);	}, queues[1]);
+				schedule_value_task([&] {	return task<void>(s2);	}, queues[0])
+					.unwrap()
+					.then([&] (async_result<void> &&)  {	called2++;	}, queues[1]);
 
 				// ASSERT
 				assert_equal(2u, queues[0].tasks.size());

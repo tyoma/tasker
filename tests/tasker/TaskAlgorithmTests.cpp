@@ -26,12 +26,12 @@ namespace tasker
 				auto complete = false;
 
 				// INIT / ACT
-				loop([&] () -> task<bool> {
-					auto t = make_shared< task_node<bool> >();
+				loop([&] () -> shared_task<bool> {
+					auto t = make_shared< shared_task_node<bool> >();
 
 					called++;
 					t->set(std::move(false));
-					return task<bool>(std::move(t));
+					return shared_task<bool>(std::move(t));
 				}, q).then([&] (result_ref<void> r) {
 					*r; // no exception
 					complete = true;
@@ -74,11 +74,11 @@ namespace tasker
 				auto complete = false;
 
 				// ACT
-				loop([&] () -> task<bool> {
-					auto t = make_shared< task_node<bool> >();
+				loop([&] () -> shared_task<bool> {
+					auto t = make_shared< shared_task_node<bool> >();
 
 					t->set(std::move(--times > 0u));
-					return task<bool>(std::move(t));
+					return shared_task<bool>(std::move(t));
 				}, q).then([&] (result_ref<void> r) {
 					*r; // no exception
 					complete = true;
@@ -148,11 +148,11 @@ namespace tasker
 				auto complete = false;
 
 				// ACT
-				loop([&] () -> task<bool> {
-					auto t = make_shared< task_node<bool> >();
+				loop([&] () -> shared_task<bool> {
+					auto t = make_shared< shared_task_node<bool> >();
 
 					t->fail(runtime_error(""));
-					return task<bool>(std::move(t));
+					return shared_task<bool>(std::move(t));
 				}, q).then([&] (result_ref<void> r) {
 					try
 					{
@@ -174,27 +174,27 @@ namespace tasker
 
 		begin_test_suite( TaskAlgorithmWhenAllTests )
 			template <typename T>
-			static task<T> from_node(const shared_ptr<task_node<T>> &from)
-			{	return task<T>(typename task_node<T>::ptr(from));	}
+			static shared_task<T> from_node(const shared_ptr<shared_task_node<T>> &from)
+			{	return shared_task<T>(from);	}
 
 			test( ContinuationIsScheduledImmediatellyForSingleAntecedent )
 			{
 				// INIT
 				mocks::queue q;
-				const auto t_void = make_shared<task_node<void>>();
-				const auto t_int = make_shared<task_node<int>>();
-				const auto t_string = make_shared<task_node<string>>();
+				const auto t_void = make_shared<shared_task_node<void>>();
+				const auto t_int = make_shared<shared_task_node<int>>();
+				const auto t_string = make_shared<shared_task_node<string>>();
 				auto invoked = false;
 
 				// INIT / ACT
-				task<string> t1 = when_all([&] (result_ref<void> /*r*/) {
+				shared_task<string> t1 = when_all([&] (result_ref<void> /*r*/) {
 					invoked = true;
 					return string();
 				}, q, from_node(t_void));
-				task<void> t2 = when_all([&] (result_ref<int> /*r*/) {
+				shared_task<void> t2 = when_all([&] (result_ref<int> /*r*/) {
 					invoked = true;
 				}, q, from_node(t_int));
-				task<int> t3 = when_all([&] (result_ref<string> /*r*/) {
+				shared_task<int> t3 = when_all([&] (result_ref<string> /*r*/) {
 					invoked = true;
 					return 123;
 				}, q, from_node(t_string));
@@ -219,8 +219,8 @@ namespace tasker
 			{
 				// INIT
 				mocks::queue q;
-				const auto t_int = make_shared<task_node<int>>();
-				const auto t_string = make_shared<task_node<string>>();
+				const auto t_int = make_shared<shared_task_node<int>>();
+				const auto t_string = make_shared<shared_task_node<string>>();
 				int iresult = 0;
 				string sresult;
 
@@ -255,15 +255,15 @@ namespace tasker
 			{
 				// INIT
 				mocks::queue q;
-				const auto t_void = make_shared<task_node<void>>();
-				const auto t_int = make_shared<task_node<int>>();
-				const auto t_string = make_shared<task_node<string>>();
+				const auto t_void = make_shared<shared_task_node<void>>();
+				const auto t_int = make_shared<shared_task_node<int>>();
+				const auto t_string = make_shared<shared_task_node<string>>();
 				auto invoked = false;
 				int iresult = 0;
 				string sresult;
 
 				// INIT / ACT
-				task<string> t1 = when_all([&] (result_ref<void> r1, result_ref<int> r2, result_ref<string> r3) {
+				shared_task<string> t1 = when_all([&] (result_ref<void> r1, result_ref<int> r2, result_ref<string> r3) {
 					invoked = true;
 					*r1;
 					iresult = *r2;

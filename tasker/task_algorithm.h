@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "task.h"
+#include "shared_task.h"
 #include "type_traits.h"
 
 #include <mt/atomic.h>
@@ -31,7 +31,7 @@ namespace tasker
 	namespace detail
 	{
 		template <typename ResultT, typename CallbackT, typename... T>
-		class when_all_completion : public task_node<ResultT>
+		class when_all_completion : public shared_task_node<ResultT>
 		{
 		public:
 			when_all_completion(CallbackT &&callback, queue &continue_on)
@@ -40,9 +40,9 @@ namespace tasker
 			{	}
 
 			template <std::size_t I, typename T2>
-			void set_result(const async_result<T2> &result)
+			void set_result(T2 &&result)
 			{
-				std::get<I>(_result) = result;
+				std::get<I>(_result) = std::forward<T2>(result);
 				if (1 == _remaining.fetch_add(-1, mt::memory_order_acq_rel))
 				{
 					auto self = std::static_pointer_cast<when_all_completion>(this->shared_from_this());
@@ -58,7 +58,7 @@ namespace tasker
 					return invoke(typename make_index_sequence<sizeof...(T)>::type());
 				};
 
-				tasker::set_result(static_cast< task_node<ResultT> & >(*this), callback);
+				forward_result<tasker::shared_task_node>(static_cast< shared_task_node<ResultT> & >(*this), callback);
 			}
 
 			template <std::size_t... I>
@@ -74,7 +74,7 @@ namespace tasker
 
 		template <typename StateT, typename... T, std::size_t... I>
 		inline void subscribe_when_all(const std::shared_ptr<StateT> &state, detail::index_sequence<I...>,
-			const task<T> &...tasks)
+			const shared_task<T> &...tasks)
 		{
 			int unused[] = { 0, (tasks.then([state] (const async_result<T> &result) {
 				state->template set_result<I>(result);
@@ -84,7 +84,7 @@ namespace tasker
 		}
 
 		template <typename BodyT>
-		inline void loop(const task_node<void>::ptr &completion, const BodyT &body, queue &queue_)
+		inline void loop(const shared_task_node<void>::ptr &completion, const BodyT &body, queue &queue_)
 		{
 			schedule_task(body, queue_)
 				.unwrap()
@@ -105,17 +105,17 @@ namespace tasker
 	}
 
 	template <typename BodyT>
-	inline task<void> loop(const BodyT &body, queue &queue_)
+	inline shared_task<void> loop(const BodyT &body, queue &queue_)
 	{
-		auto loop_completion = std::make_shared< task_node<void> >();
+		auto loop_completion = std::make_shared< shared_task_node<void> >();
 
 		detail::loop(loop_completion, body, queue_);
-		return task<void>(std::move(loop_completion));
+		return shared_task<void>(std::move(loop_completion));
 	}
 
 	template <typename F, typename... T>
-	inline task<typename detail::invoke_result_t<F, const async_result<T> &...>> when_all(F &&continuation_callback, queue &queue_,
-		const task<T> &...tasks)
+	inline shared_task<typename detail::invoke_result_t<F, const async_result<T> &...>> when_all(F &&continuation_callback, queue &queue_,
+		const shared_task<T> &...tasks)
 	{
 		typedef detail::invoke_result_t<F, const async_result<T> &...> result_type;
 		typedef detail::when_all_completion<result_type, F, T...> state_type;
@@ -123,6 +123,6 @@ namespace tasker
 		auto completion = std::make_shared<state_type>(std::forward<F>(continuation_callback), queue_);
 
 		detail::subscribe_when_all(completion, typename detail::make_index_sequence<sizeof...(T)>::type(), tasks...);
-		return task<result_type>(std::move(completion));
+		return shared_task<result_type>(std::move(completion));
 	}
 }

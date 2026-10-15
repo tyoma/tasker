@@ -39,25 +39,20 @@ namespace tasker
 		void operator =(const async_result &rhs);
 
 		void set(T &&from);
-
-		template <typename E>
-		void fail(E &&exception);
 		void fail(std::exception_ptr &&exception);
 
 		const T &operator *() const;
+		T &&operator *();
 
 	protected:
 		void assert_empty() const;
 		void assert_readable() const;
 
 	private:
-		typedef std::function<void ()> rethrow_t;
-
-	private:
 		async_result(const async_result &other);
 
 	private:
-		char _buffer[sizeof(T) > sizeof(rethrow_t) ? sizeof(T) : sizeof(rethrow_t)];
+		char _buffer[sizeof(T) > sizeof(std::exception_ptr) ? sizeof(T) : sizeof(std::exception_ptr)];
 
 	protected:
 		async_state _state;
@@ -87,7 +82,7 @@ namespace tasker
 		if (async_completed == _state)
 			static_cast<T *>(static_cast<void *>(_buffer))->~T();
 		else if (async_faulted == _state)
-			static_cast<const rethrow_t *>(static_cast<void *>(_buffer))->~rethrow_t();
+			static_cast<const std::exception_ptr *>(static_cast<void *>(_buffer))->~exception_ptr();
 	}
 
 	template <typename T>
@@ -101,7 +96,7 @@ namespace tasker
 		if (async_completed == rhs._state)
 			new (_buffer) T(*rhs);
 		else if (async_faulted == rhs._state)
-			new (_buffer) rethrow_t(*static_cast<const rethrow_t *>(static_cast<const void *>(rhs._buffer)));
+			new (_buffer) std::exception_ptr(*static_cast<const std::exception_ptr *>(static_cast<const void *>(rhs._buffer)));
 		_state = rhs._state;
 	}
 
@@ -114,21 +109,10 @@ namespace tasker
 	}
 
 	template <typename T>
-	template <typename E>
-	inline void async_result<T>::fail(E &&exception)
-	{
-		auto e = exception;
-
-		assert_empty();
-		new (_buffer) rethrow_t([e] {	throw e;	});
-		_state = async_faulted;
-	}
-
-	template <typename T>
 	inline void async_result<T>::fail(std::exception_ptr &&exception)
 	{
 		assert_empty();
-		new (_buffer) rethrow_t([exception] {	std::rethrow_exception(exception);	});
+		new (_buffer) std::exception_ptr(std::forward<std::exception_ptr>(exception));
 		_state = async_faulted;
 	}
 
@@ -137,6 +121,13 @@ namespace tasker
 	{
 		assert_readable();
 		return *static_cast<const T *>(static_cast<const void *>(_buffer));
+	}
+
+	template <typename T>
+	inline T &&async_result<T>::operator *()
+	{
+		assert_readable();
+		return std::move(*static_cast<T *>(static_cast<void *>(_buffer)));
 	}
 
 	template <typename T>
@@ -152,7 +143,7 @@ namespace tasker
 		if (async_in_progress == _state)
 			throw std::logic_error("cannot dereference as no value has been set");
 		else if (async_faulted == _state)
-			(*static_cast<const rethrow_t *>(static_cast<const void *>(_buffer)))();
+			std::rethrow_exception(*static_cast<const std::exception_ptr *>(static_cast<const void *>(_buffer)));
 	}
 
 

@@ -7,12 +7,14 @@ set(TASKER_TEST_SOURCES
 	LifetimeBlockTests.cpp
 	ObjectPoolTests.cpp
 	PrivateQueueTests.cpp
+	SharedTaskNodeTests.cpp
+	SharedTaskTests.cpp
 	SugarTests.cpp
 	ThreadQueueTests.cpp
 	TaskAlgorithmTests.cpp
 	TaskNodeTests.cpp
-	TaskTests.cpp
 	TaskQueueTests.cpp
+	TaskTests.cpp
 	../test-helpers/src/thread.cpp
 )
 

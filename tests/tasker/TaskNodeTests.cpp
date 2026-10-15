@@ -1,6 +1,5 @@
 #include <tasker/task_node.h>
 
-#include "../test-helpers/helpers.h"
 #include <ut/assert.h>
 #include <ut/test.h>
 
@@ -10,281 +9,282 @@ namespace tasker
 {
 	namespace tests
 	{
-		namespace
+		namespace mocks
 		{
 			template <typename T>
-			exception_ptr make_exception(const T &e)
+			struct continuation : tasker::continuation<async_result<T>>
 			{
-				try
-				{	throw e;	}
-				catch (...)
-				{	return current_exception();	}
-			}
-
-			template <typename T, typename F>
-			struct continuation_impl : continuation<T>, F
-			{
-				continuation_impl(const F &from)
-					: F(from)
+				continuation(const function<void (async_result<T> &&result)> &acceptor_ = [] (async_result<T> &&) {	})
+					: called(0), acceptor(acceptor_)
 				{	}
 
-				virtual void begin(const shared_ptr< const async_result<T> > &antecedent) override
-				{	(*this)(*antecedent);	}
+				virtual void begin(const std::shared_ptr<async_result<T>> &antecedent) override
+				{
+					acceptor(std::move(*antecedent));
+					called++;
+				}
+
+				int called;
+				const function<void (async_result<T> &&result)> acceptor;
 			};
 
-			template <typename F, typename ArgT>
-			struct task_result
+			template <>
+			struct continuation<void> : tasker::continuation<async_result<void>>
 			{
-				static F value_f();
-				static async_result<ArgT> value_arg();
-				typedef decltype(value_f()(value_arg())) type;
-			};
+				continuation(const function<void (async_result<void> &&result)> &acceptor_ = [] (async_result<void> &&) {	})
+					: called(0), acceptor(acceptor_)
+				{	}
 
-			template <typename T, typename F>
-			typename continuation<T>::ptr make_continuation(const F &f)
-			{	return make_shared< continuation_impl<T, F> >(f);	}
+				virtual void begin(const std::shared_ptr<async_result<void>> &antecedent) override
+				{
+					acceptor(std::move(*antecedent));
+					called++;
+				}
+
+				int called;
+				const function<void (async_result<void> &&result)> acceptor;
+			};
 		}
 
 		begin_test_suite( TaskNodeTests )
-			test( SettingResultInvokesRegisteredContinuations )
+			test( ContinuationAddedToPendingNodeIsNotExecuted )
 			{
 				// INIT
-				vector< pair<int, int> > log1;
-				vector< pair<int, string> > log2;
-				auto log3 = 0;
-				auto n1 = make_shared< task_node<int> >();
-				auto n2 = make_shared< task_node<int> >();
-				auto n3 = make_shared< task_node<string> >();
-				auto n4 = make_shared< task_node<string> >();
-				auto n5 = make_shared< task_node<void> >();
-				auto n6 = make_shared< task_node<void> >();
-
-				// INIT / ACT
-				n1->then(make_continuation<int>([&] (const async_result<int> &v) {	log1.push_back(make_pair(0, *v));	}));
-				n1->then(make_continuation<int>([&] (const async_result<int> &v) {	log1.push_back(make_pair(1, *v));	}));
-				n1->then(make_continuation<int>([&] (const async_result<int> &v) {	log1.push_back(make_pair(2, *v));	}));
-				n2->then(make_continuation<int>([&] (const async_result<int> &v) {	log1.push_back(make_pair(3, *v));	}));
-
-				n3->then(make_continuation<string>([&] (const async_result<string> &v) {	log2.push_back(make_pair(0, *v));	}));
-				n3->then(make_continuation<string>([&] (const async_result<string> &v) {	log2.push_back(make_pair(1, *v));	}));
-				n4->then(make_continuation<string>([&] (const async_result<string> &v) {	log2.push_back(make_pair(2, *v));	}));
-
-				n5->then(make_continuation<void>([&] (const async_result<void> &v) {	*v, log3++;	}));
-				n5->then(make_continuation<void>([&] (const async_result<void> &v) {	*v, log3++;	}));
-				n6->then(make_continuation<void>([&] (const async_result<void> &v) {	*v, log3++;	}));
+				auto n1 = make_shared<task_node<string>>();
+				auto n2 = make_shared<task_node<void>>();
+				auto c1 = make_shared<mocks::continuation<string>>();
+				auto c2 = make_shared<mocks::continuation<void>>();
 
 				// ACT
-				n1->set(3141);
+				n1->then(c1);
+				n2->then(c2);
 
-				// ASSERT
-				assert_equal(plural + make_pair(0, 3141) + make_pair(1, 3141) + make_pair(2, 3141), log1);
-
-				// INIT
-				log1.clear();
-
-				// ACT
-				n2->set(314);
-
-				// ASSERT
-				assert_equal(plural + make_pair(3, 314), log1);
-
-				// ACT
-				n3->set(string("lorem"));
-
-				// ASSERT
-				assert_equal(plural + make_pair(0, string("lorem")) + make_pair(1, string("lorem")), log2);
-
-				// INIT
-				log2.clear();
-
-				// ACT
-				n4->set(string("Lorem Ipsum Amet Dolor"));
-
-				// ASSERT
-				assert_equal(plural + make_pair(2, string("Lorem Ipsum Amet Dolor")), log2);
-
-				// ACT
-				n5->set();
-
-				// ASSERT
-				assert_equal(2, log3);
-
-				// ACT
-				n6->set();
-
-				// ASSERT
-				assert_equal(3, log3);
-		}
-
-
-			test( RegisteringContinuationWhenResultIsSetCallsThemImmediately )
-			{
-				// INIT
-				vector<int> log1;
-				vector<string> log2;
-				auto log3 = 0;
-				auto n1 = make_shared< task_node<int> >();
-				auto n2 = make_shared< task_node<int> >();
-				auto n3 = make_shared< task_node<string> >();
-				auto n4 = make_shared< task_node<void> >();
-
-				// INIT / ACT
-				n1->set(1211);
-				n2->set(17);
-				n3->set(string("Lorem Ipsum Amet"));
-				n4->set();
-
-				// ACT
-				n1->then(make_continuation<int>([&] (const async_result<int> &v) {	log1.push_back(*v);	}));
-				n2->then(make_continuation<int>([&] (const async_result<int> &v) {	log1.push_back(*v);	}));
-				n3->then(make_continuation<string>([&] (const async_result<string> &v) {	log2.push_back(*v);	}));
-				n4->then(make_continuation<void>([&] (const async_result<void> &v) {	*v, log3++;	}));
-
-				// ASSERT
-				assert_equal(plural + 1211 + 17, log1);
-				assert_equal(plural + string("Lorem Ipsum Amet"), log2);
-				assert_equal(1, log3);
+				// ASSERT 
+				assert_equal(0, c1->called);
+				assert_equal(0, c2->called);
+				assert_equal(2, c1.use_count());
+				assert_equal(2, c2.use_count());
 			}
 
 
-			test( SettingFailureViaExceptionPtrIsPropogatedToCallbacks )
+			test( SettingContinuationFailsOnConsequentAttempts )
 			{
 				// INIT
-				auto faults = 0;
-				auto n1 = make_shared< task_node<void> >();
-				auto n2 = make_shared< task_node<void> >();
+				auto n = make_shared<task_node<string>>();
+				auto c = make_shared<mocks::continuation<string>>();
 
-				n1->then(make_continuation<void>([&] (const async_result<void> &v) {
-					try
-					{	*v;	}
-					catch (int e)
-					{
-						assert_equal(18131, e);
-						faults++;
-					}
-				}));
-				n2->then(make_continuation<void>([&] (const async_result<void> &v) {
-					try
-					{	*v;	}
-					catch (string e)
-					{
-						assert_equal("LoremIpsum", e);
-						faults++;
-					}
-				}));
-
-				// ACT
-				n1->fail(make_exception(18131));
-
-				// ASSERT
-				assert_equal(1, faults);
-
-				// ACT
-				n2->fail(make_exception(string("LoremIpsum")));
-
-				// ASSERT
-				assert_equal(2, faults);
+				n->then(c);
 
 				// ACT / ASSERT
-				n2->then(make_continuation<void>([&] (const async_result<void> &v) {
-					try
-					{	*v;	}
-					catch (string e)
-					{
-						assert_equal("LoremIpsum", e);
-						faults++;
-					}
-				}));
-
-				// ASSERT
-				assert_equal(3, faults);
+				assert_throws(n->then(c), logic_error);
+				assert_equal(2, c.use_count());
 			}
 
 
-			test( SettingFailureViaExceptionValueIsPropogatedToCallbacks )
+			test( SettingResultFailsOnConsequentAttempts )
 			{
 				// INIT
-				auto faults = 0;
-				auto n1 = make_shared< task_node<void> >();
-				auto n2 = make_shared< task_node<void> >();
+				auto n1 = make_shared<task_node<string>>();
+				auto n2 = make_shared<task_node<void>>();
 
-				n1->then(make_continuation<void>([&] (const async_result<void> &v) {
-					try
-					{	*v;	}
-					catch (int e)
-					{
-						assert_equal(18131, e);
-						faults++;
-					}
-				}));
-				n2->then(make_continuation<void>([&] (const async_result<void> &v) {
-					try
-					{	*v;	}
-					catch (string e)
-					{
-						assert_equal("LoremIpsum", e);
-						faults++;
-					}
-				}));
-
-				// ACT
-				n1->fail(18131);
-
-				// ASSERT
-				assert_equal(1, faults);
-
-				// ACT
-				n2->fail(string("LoremIpsum"));
-
-				// ASSERT
-				assert_equal(2, faults);
+				// ACT / ASSERT (no exception)
+				n1->set("first");
+				n2->set();
 
 				// ACT / ASSERT
-				n2->then(make_continuation<void>([&] (const async_result<void> &v) {
-					try
-					{	*v;	}
-					catch (const string &e)
-					{
-						assert_equal("LoremIpsum", e);
-						faults++;
-					}
-				}));
-
-				// ASSERT
-				assert_equal(3, faults);
+				assert_throws(n1->set("second"), logic_error);
+				assert_throws(n2->set(), logic_error);
 			}
 
 
-			test( ContinuationsAreReleasedUponSettingTheResult )
+			test( SettingFailureFailsOnConsequentAttempts )
 			{
-				struct dummy : continuation<void>
+				// INIT
+				auto n1 = make_shared<task_node<string>>();
+				auto n2 = make_shared<task_node<void>>();
+				auto n3 = make_shared<task_node<string>>();
+				auto n4 = make_shared<task_node<void>>();
+
+				// ACT / ASSERT (no exception)
+				n1->fail("first");
+				n2->fail(123);
+				n3->fail(make_exception_ptr(runtime_error("error")));
+				n4->fail(make_exception_ptr(runtime_error("error")));
+
+				// ACT / ASSERT
+				assert_throws(n1->fail(make_exception_ptr(runtime_error("another error"))), logic_error);
+				assert_throws(n2->fail(make_exception_ptr(runtime_error("another error"))), logic_error);
+				assert_throws(n3->fail("second"), logic_error);
+				assert_throws(n4->fail(456), logic_error);
+			}
+
+
+			test( SettingFailureAfterResultOrViceVersaFailsOnConsequentAttempts )
+			{
+				// INIT
+				auto n1 = make_shared<task_node<string>>();
+				auto n2 = make_shared<task_node<void>>();
+
+				// ACT / ASSERT (no exception)
+				n1->set("first");
+				n2->fail(123);
+
+				// ACT / ASSERT
+				assert_throws(n1->fail(make_exception_ptr(runtime_error("another error"))), logic_error);
+				assert_throws(n2->set(), logic_error);
+			}
+
+
+			test( AssigningContinuationAfterResultIsSetDeliversItToTheContinuation )
+			{
+				// INIT
+				auto n1 = make_shared<task_node<string>>();
+				auto n2 = make_shared<task_node<void>>();
+				auto c1 = make_shared<mocks::continuation<string>>([] (async_result<string> &&r) {
+					assert_equal("loremIPSUMamet", *r);
+				});
+				auto c2 = make_shared<mocks::continuation<void>>([] (async_result<void> &&r) {
+					*r; // Must not throw.
+				});
+
+				n1->set("loremIPSUMamet");
+				n2->set();
+	
+				// ACT / ASSERT
+				n1->then(c1);
+				n2->then(c2);
+
+				// ASSERT
+				assert_equal(1, c1->called);
+				assert_equal(1, c2->called);
+				assert_throws(n1->then(c1), logic_error); // State is kept.
+				assert_throws(n2->then(c2), logic_error);
+			}
+
+
+			test( AssigningContinuationAfterFailureIsSetDeliversItToTheContinuation )
+			{
+				// INIT
+				auto n1 = make_shared<task_node<string>>();
+				auto n2 = make_shared<task_node<void>>();
+				auto c1 = make_shared<mocks::continuation<string>>([] (async_result<string> &&r) {
+					assert_throws(*r, invalid_argument);
+				});
+				auto c2 = make_shared<mocks::continuation<void>>([] (async_result<void> &&r) {
+					assert_throws(*r, out_of_range);
+				});
+
+				n1->fail(invalid_argument(""));
+				n2->fail(make_exception_ptr(out_of_range("")));
+	
+				// ACT / ASSERT
+				n1->then(c1);
+				n2->then(c2);
+
+				// ASSERT
+				assert_equal(1, c1->called);
+				assert_equal(1, c2->called);
+				assert_throws(n1->then(c1), logic_error); // State is kept.
+				assert_throws(n2->then(c2), logic_error);
+			}
+
+
+			test( SettingResultWhenContinuationIsAssignedDeliversItToTheContinuation )
+			{
+				// INIT
+				auto n1 = make_shared<task_node<string>>();
+				auto n2 = make_shared<task_node<void>>();
+				auto c1 = make_shared<mocks::continuation<string>>([] (async_result<string> &&r) {
+					assert_equal("lorem ipsum amet", *r);
+				});
+				auto c2 = make_shared<mocks::continuation<void>>([] (async_result<void> &&r) {
+					*r; // Must not throw.
+				});
+
+				n1->then(c1);
+				n2->then(c2);
+
+				// ACT / ASSERT
+				n1->set("lorem ipsum amet");
+				n2->set();
+
+				// ASSERT
+				assert_equal(1, c1->called);
+				assert_equal(1, c2->called);
+			}
+
+
+			test( SettingAFailureWhenContinuationIsAssignedDeliversItToTheContinuation )
+			{
+				// INIT
+				auto n1 = make_shared<task_node<string>>();
+				auto n2 = make_shared<task_node<void>>();
+				auto c1 = make_shared<mocks::continuation<string>>([] (async_result<string> &&r) {
+					assert_throws(*r, invalid_argument);
+				});
+				auto c2 = make_shared<mocks::continuation<void>>([] (async_result<void> &&r) {
+					assert_throws(*r, out_of_range);
+				});
+
+				n1->then(c1);
+				n2->then(c2);
+
+				// ACT / ASSERT
+				n1->fail(invalid_argument(""));
+				n2->fail(make_exception_ptr(out_of_range("")));
+
+				// ASSERT
+				assert_equal(1, c1->called);
+				assert_equal(1, c2->called);
+			}
+
+
+			test( FailureToCopyTheResultIsDeliveredToContinuationAsAFailure )
+			{
+				struct failure_on_copy
 				{
-					virtual void begin(const shared_ptr< const async_result<void> > &/*antecedent*/) override
-					{	}
+					failure_on_copy() = default;
+
+					failure_on_copy(const failure_on_copy &)
+					{	throw string("an error to copy");	}
+
+					void operator =(const failure_on_copy &rhs) = delete;
 				};
 
 				// INIT
-				auto parent = make_shared< task_node<void> >();
-				auto child1 = make_shared<dummy>();
-				auto child2 = make_shared<dummy>();
+				auto n = make_shared<task_node<failure_on_copy>>();
+				auto c = make_shared<mocks::continuation<failure_on_copy>>([] (async_result<failure_on_copy> &&r) {
+					assert_throws(*r, string);
+				});
 
-				parent->then(child1);
-				parent->then(child2);
+				n->then(c);
 
-				// ACT
-				parent->set();
+				// ACT / ASSERT
+				n->set(failure_on_copy());
 
 				// ASSERT
-				assert_equal(1, child1.use_count());
-				assert_equal(1, child2.use_count());
+				assert_equal(1, c->called);
 			}
-		end_test_suite
 
 
-		begin_test_suite( WhenAllTests )
-			test( WhenAllActAsSimpleContinuation )
+			test( ContinuationIsReleasedAfterInvocation )
 			{
+				// INIT
+				auto p = make_shared<bool>();
+				auto n = make_shared<task_node<void>>();
+
+				n->then(make_shared<mocks::continuation<void>>([p] (async_result<void> &&) {
+					assert_not_equal(1, p.use_count());
+				}));
+
+				// ASSERT
+				assert_equal(2, p.use_count());
+
+				// ACT
+				n->set();
 				
+				// ASSERT
+				assert_equal(1, p.use_count());
 			}
 		end_test_suite
 	}

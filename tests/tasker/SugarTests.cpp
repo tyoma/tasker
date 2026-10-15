@@ -15,8 +15,8 @@ namespace no_a_tasker // Made intentionally to verify Koenig lookup is working.
 		using tasker::async_result;
 		using tasker::immediate;
 		using tasker::next;
-		using tasker::task;
-		using tasker::task_node;
+		using tasker::shared_task;
+		using tasker::shared_task_node;
 
 		using tasker::tests::plural;
 
@@ -34,13 +34,13 @@ namespace no_a_tasker // Made intentionally to verify Koenig lookup is working.
 			{
 				// INIT
 				auto called = 0;
-				auto completion_v = make_shared<task_node<void>>();
+				auto completion_v = make_shared<shared_task_node<void>>();
 
 				completion_v->set();
-				task<void> completed_v_task(std::move(completion_v));
+				shared_task<void> completed_v_task(std::move(completion_v));
 
 				// ACT
-				task<void> t1 = completed_v_task >> next([&] (const async_result<void> &) {
+				shared_task<void> t1 = completed_v_task >> next([&] (const async_result<void> &) {
 					++called;
 				}, immediate);
 
@@ -48,7 +48,7 @@ namespace no_a_tasker // Made intentionally to verify Koenig lookup is working.
 				assert_equal(1, called);
 
 				// ACT
-				task<double> t2 = completed_v_task >> next([&](const async_result<void> &) {
+				shared_task<double> t2 = completed_v_task >> next([&] (const async_result<void> &) {
 					++called;
 					return 1.14;
 				}, immediate);
@@ -67,11 +67,11 @@ namespace no_a_tasker // Made intentionally to verify Koenig lookup is working.
 			{
 				// INIT
 				auto called = 0;
-				auto completion_v = make_shared<task_node<void>>();
+				auto completion_v = make_shared<shared_task_node<void>>();
 				mocks::queue q;
 
 				completion_v->set();
-				task<void> completed_v_task(std::move(completion_v));
+				shared_task<void> completed_v_task(std::move(completion_v));
 
 				// ACT
 				completed_v_task >> next([&] (const async_result<void> &) {
@@ -116,10 +116,10 @@ namespace no_a_tasker // Made intentionally to verify Koenig lookup is working.
 				// INIT
 				mocks::queue q1, q2;
 				vector<int> log;
-				auto completion_v = make_shared<task_node<void>>();
+				auto completion_v = make_shared<shared_task_node<void>>();
 
 				completion_v->set();
-				task<void> completed_v_task(std::move(completion_v));
+				shared_task<void> completed_v_task(std::move(completion_v));
 
 				// ACT
 				completed_v_task
@@ -171,18 +171,18 @@ namespace no_a_tasker // Made intentionally to verify Koenig lookup is working.
 			//test( BareCallbacksAreInvokedAsImmediateContinuations )
 			//{
 			//	// INIT
-			//	auto completion_v = make_shared<task_node<void>>();
-			//	auto completion_str = make_shared<task_node<string>>();
+			//	auto completion_v = make_shared<shared_task_node<void>>();
+			//	auto completion_str = make_shared<shared_task_node<string>>();
 			//	auto c_v = completion_v;
 			//	auto c_str = completion_str;
 			//	auto called = 0;
 			//	string called_str;
 
 			//	// ACT
-			//	task<void> t1 = task<void>(std::move(completion_v)) >> [&] (const async_result<void> &) {
+			//	shared_task<void> t1 = shared_task<void>(std::move(completion_v)) >> [&] (const async_result<void> &) {
 			//		called++;
 			//	};
-			//	task<int> t2 = task<string>(std::move(completion_str)) >> [&] (const async_result<string> &r) {
+			//	shared_task<int> t2 = shared_task<string>(std::move(completion_str)) >> [&] (const async_result<string> &r) {
 			//		called_str = *r;
 			//		return 123;
 			//	};
@@ -208,7 +208,7 @@ namespace no_a_tasker // Made intentionally to verify Koenig lookup is working.
 				auto value = 0;
 
 				// ACT
-				task<void> t_void = tasker::go >> [&] {
+				shared_task<void> t_void = tasker::go >> [&] {
 					++called;
 				} / immediate;
 
@@ -216,7 +216,7 @@ namespace no_a_tasker // Made intentionally to verify Koenig lookup is working.
 				assert_equal(1, called);
 
 				// ACT
-				task<int> t_int = tasker::go >> [&] {
+				shared_task<int> t_int = tasker::go >> [&] {
 					++called;
 					return 42;
 				} / immediate;
@@ -257,13 +257,13 @@ namespace no_a_tasker // Made intentionally to verify Koenig lookup is working.
 			test( OperatorPlusCombinesTasksIntoATuple )
 			{
 				// INIT / ACT / ASSERT
-				tuple<task<void>, task<string>> group1
+				tuple<shared_task<void>, shared_task<string>> group1
 					= tasker::go >> [] {} / immediate & tasker::go >> [] { return string(); } / immediate;
-				tuple<task<void>, task<double>> group2
+				tuple<shared_task<void>, shared_task<double>> group2
 					= tasker::go >> [] {} / immediate & tasker::go >> [] { return 3.14; } / immediate;
-				tuple<task<string>, task<void>, task<double>> group3
+				tuple<shared_task<string>, shared_task<void>, shared_task<double>> group3
 					= tasker::go >> [] { return string(); } / immediate & (tasker::go >> [] {} / immediate & tasker::go >> [] { return 3.14; } / immediate);
-				tuple<task<string>, task<void>, task<double>> group4
+				tuple<shared_task<string>, shared_task<void>, shared_task<double>> group4
 					= (tasker::go >> [] { return string(); } / immediate & tasker::go >> [] {} / immediate) & tasker::go >> [] { return 3.14; } / immediate;
 			}
 
@@ -272,15 +272,15 @@ namespace no_a_tasker // Made intentionally to verify Koenig lookup is working.
 			{
 				// INIT
 				mocks::queue q;
-				auto completion_v = make_shared<task_node<void>>();
-				auto completion_str = make_shared<task_node<string>>();
+				auto completion_v = make_shared<shared_task_node<void>>();
+				auto completion_str = make_shared<shared_task_node<string>>();
 				auto c_v = completion_v;
 				auto c_str = completion_str;
 				auto called = 0;
 				string called_str;
 
 				// ACT
-				task<double> t = (task<void>(std::move(completion_v)) & task<string>(std::move(completion_str)))
+				shared_task<double> t = (shared_task<void>(std::move(completion_v)) & shared_task<string>(std::move(completion_str)))
 					>> [&](const async_result<void> &, const async_result<string> &r) {
 						called_str = *r;
 						++called;
@@ -346,12 +346,12 @@ namespace no_a_tasker // Made intentionally to verify Koenig lookup is working.
 			{
 				// INIT
 				auto value = 0;
-				auto inner = make_shared<task_node<int>>();
+				auto inner = make_shared<shared_task_node<int>>();
 				auto inner_copy = inner;
 
 				// ACT
 				tasker::go
-					>> [&] {	return task<int>(std::move(inner));	} / immediate
+					>> [&] {	return shared_task<int>(std::move(inner));	} / immediate
 					>> tasker::unwrap
 					>> [&] (const async_result<int> &r) {	value = *r;	} / immediate;
 
