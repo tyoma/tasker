@@ -29,6 +29,7 @@ using namespace std;
 
 @interface Queue : NSObject
 	-(id) init;
+	-(void) stop;
 	-(void) scheduleWakeup: (tasker::task_queue::wake_up)wakeup;
 	-(void) executeReady: (NSObject *)nothing;
 @end
@@ -37,38 +38,47 @@ using namespace std;
 	{
 		@public shared_ptr<tasker::task_queue> tasks;
 		dispatch_queue_t _gcd_queue;
+		dispatch_source_t _timer;
 		NSThread *_thread;
 	}
-	
+
 	-(id) init
 	{
 		self = [super init];
 		_gcd_queue = dispatch_queue_create("com.tasker.ui_queue", DISPATCH_QUEUE_SERIAL);
 		_thread = [NSThread currentThread];
+		_timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, _gcd_queue);
+		dispatch_source_set_timer(_timer, DISPATCH_TIME_FOREVER, DISPATCH_TIME_FOREVER, 0);
+		dispatch_source_set_event_handler(_timer, ^{
+			[self performSelector:@selector(executeReady:) onThread:_thread withObject:nil waitUntilDone:false];
+		});
+		dispatch_resume(_timer);
 		return self;
 	}
-	
+
 	-(void) dealloc
 	{
+		dispatch_release(_timer);
 		dispatch_release(_gcd_queue);
 		[super dealloc];
 	}
-	
+
+	-(void) stop
+	{
+		tasks = nullptr;
+		dispatch_source_cancel(_timer);
+	}
+
 	-(void) scheduleWakeup: (tasker::task_queue::wake_up)wakeup
 	{
 		if (!wakeup.second)
 			return;
-
-		auto execute = ^{
-			[self performSelector:@selector(executeReady:) onThread:_thread withObject:nil waitUntilDone:false];
-		};
-
-		if (auto delay_ms = wakeup.first.count())
-			dispatch_after(dispatch_time(DISPATCH_TIME_NOW, delay_ms * 1000000), _gcd_queue, execute);
+		else if (const auto delay_ms = wakeup.first.count())
+			dispatch_source_set_timer(_timer, dispatch_time(DISPATCH_TIME_NOW, delay_ms * 1000000), DISPATCH_TIME_FOREVER, NSEC_PER_MSEC);
 		else
-			execute();
+			[self performSelector:@selector(executeReady:) onThread:_thread withObject:nil waitUntilDone:false];
 	}
-	
+
 	-(void) executeReady: (NSObject *)nothing
 	{
 		tasker::task_queue::wake_up wakeup(mt::milliseconds(0), true);
@@ -94,29 +104,29 @@ namespace tasker
 		impl(const shared_ptr<task_queue> &queue_)
 			: _queue([[Queue alloc] init])
 		{	_queue->tasks = queue_;	}
-		
+
 		~impl()
 		{
-			_queue->tasks = nullptr;
+			[_queue stop];
 			[_queue release];
 		}
-		
+
 		void schedule_wakeup(const task_queue::wake_up &wakeup)
 		{	[_queue scheduleWakeup:wakeup];	}
 
 	private:
 		Queue *_queue;
 	};
-	
+
 
 
 	ui_queue::ui_queue(const clock &clock_)
 		: _tasks(make_shared<task_queue>(clock_)), _impl(make_shared<impl>(_tasks))
 	{	}
-		
+
 	ui_queue::~ui_queue()
 	{	}
-		
+
 	void ui_queue::schedule(std::function<void ()> &&task, mt::milliseconds defer_by)
 	{	_impl->schedule_wakeup(_tasks->schedule(std::move(task), defer_by));	}
 
